@@ -18,6 +18,7 @@ libpdfdocument_la_SOURCES =			\
 libpdfdocument_la_LDFLAGS = $(BACKEND_LIBTOOL_FLAGS)
 libpdfdocument_la_LIBADD =				\
 	$(top_builddir)/libdocument/libevdocument.la	\
+	$(top_builddir)/cut-n-paste/synctex/libsynctex.la \
 	$(BACKEND_LIBS)					\
 	$(POPPLER_LIBS)					\
 	$(CAIRO_PDF_LIBS)				\
