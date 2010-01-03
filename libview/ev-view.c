@@ -280,6 +280,8 @@ static void       ev_view_primary_clear_cb                   (GtkClipboard      
 							      gpointer            data);
 static void       ev_view_update_primary_selection           (EvView             *ev_view);
 
+static void       ev_view_open_tex_source (EvView *view, gint x, gint y);
+
 G_DEFINE_TYPE (EvView, ev_view, GTK_TYPE_LAYOUT)
 
 /* HeightToPage cache */
@@ -5772,7 +5774,7 @@ ev_view_open_tex_source (EvView *view, gint x, gint y)
 	gint docx=0, docy=0;
 	GdkRectangle page_area;
 	GtkBorder border;
-
+	printf("TEX SOURCE %d,%d\n",x,y);
 	find_page_at_location (view, x, y, &page, &ox, &oy);
 	if (page == -1)
 		return;

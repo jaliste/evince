@@ -1,11 +1,12 @@
-INCLUDES =					\
-	-I$(top_srcdir)				\
-	-I$(top_srcdir)/libdocument		\
-	-DGNOMELOCALEDIR=\"$(datadir)/locale\"  \
-	-DEVINCE_COMPILATION			\
-	$(BACKEND_CFLAGS)			\
-	$(POPPLER_CFLAGS)                       \
-	$(WARN_CXXFLAGS)			\
+INCLUDES =						\
+	-I$(top_srcdir)					\
+	-I$(top_srcdir)/libdocument			\
+	-I$(top_srcdir)/cut-n-paste/synctex 		\
+	-DGNOMELOCALEDIR=\"$(datadir)/locale\"  	\
+	-DEVINCE_COMPILATION				\
+	$(BACKEND_CFLAGS)				\
+	$(POPPLER_CFLAGS)                       	\
+	$(WARN_CXXFLAGS)				\
 	$(DISABLE_DEPRECATED)
 
 backend_LTLIBRARIES = libpdfdocument.la

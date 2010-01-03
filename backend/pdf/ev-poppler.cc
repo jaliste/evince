@@ -55,6 +55,7 @@
 #include "ev-transition-effect.h"
 #include "ev-attachment.h"
 #include "ev-image.h"
+#include "synctex_parser.h"
 
 #include <libxml/tree.h>
 #include <libxml/parser.h>
@@ -118,8 +119,10 @@ struct _PdfDocument
 
 	PdfDocumentSearch *search;
 	PdfPrintContext *print_ctx;
-
+	
 	GList *layers;
+	int synctex_enabled;
+	synctex_scanner_t scanner;
 };
 
 static void pdf_document_security_iface_init             (EvDocumentSecurityIface    *iface);
@@ -241,6 +244,9 @@ pdf_document_dispose (GObject *object)
 		g_list_foreach (pdf_document->layers, (GFunc)g_object_unref, NULL);
 		g_list_free (pdf_document->layers);
 	}
+	if (pdf_document->scanner) {
+		synctex_scanner_free(pdf_document->scanner);
+	}
 
 	G_OBJECT_CLASS (pdf_document_parent_class)->dispose (object);
 }
@@ -317,7 +323,8 @@ pdf_document_load (EvDocument   *document,
 		convert_error (poppler_error, error);
 		return FALSE;
 	}
-
+	pdf_document->scanner = synctex_scanner_new_with_output_file(uri,NULL,1);
+	
 	return TRUE;
 }
 
