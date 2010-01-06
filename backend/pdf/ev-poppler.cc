@@ -1,6 +1,7 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; c-indent-level: 8 -*- */
 /* this file is part of evince, a gnome document viewer
  *
+ * Copyright (C) 2010, Jose Aliste <jose.aliste@gmail.com>
  * Copyright (C) 2009, Juanjo Marín <juanj.marin@juntadeandalucia.es>
  * Copyright (C) 2004, Red Hat, Inc.
  *
@@ -313,9 +314,10 @@ pdf_document_load (EvDocument   *document,
 		   const char   *uri,
 		   GError      **error)
 {
+	gchar *tmp;
 	GError *poppler_error = NULL;
 	PdfDocument *pdf_document = PDF_DOCUMENT (document);
-
+	
 	pdf_document->document =
 		poppler_document_new_from_file (uri, pdf_document->password, &poppler_error);
 
@@ -323,8 +325,14 @@ pdf_document_load (EvDocument   *document,
 		convert_error (poppler_error, error);
 		return FALSE;
 	}
-	pdf_document->scanner = synctex_scanner_new_with_output_file(uri,NULL,1);
 	
+	tmp = g_strdup(uri);
+	if (uri != NULL) {
+		pdf_document->scanner = synctex_scanner_new_with_output_file(tmp+7, NULL, 1);
+		if (pdf_document->scanner) { 
+			synctex_scanner_display(pdf_document->scanner);
+		}
+	}
 	return TRUE;
 }
 
