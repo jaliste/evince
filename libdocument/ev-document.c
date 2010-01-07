@@ -340,6 +340,17 @@ ev_document_get_page (EvDocument *document,
 	return klass->get_page (document, index);
 }
 
+void
+ev_document_sync_to_source (EvDocument *document,
+		      	    gint        page,
+		      	    gdouble	h,
+		      	    gdouble	v)
+{
+	EvDocumentClass *klass = EV_DOCUMENT_GET_CLASS (document);
+
+	return klass->sync_to_source (document, page, h, v);
+}
+
 static gint
 _ev_document_get_n_pages (EvDocument  *document)
 {

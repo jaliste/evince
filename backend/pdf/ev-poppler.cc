@@ -844,6 +844,29 @@ pdf_document_get_info (EvDocument *document)
 
 	return info;
 }
+static void
+pdf_document_sync_to_source (EvDocument *document,
+			     gint page,
+			     gdouble h, 
+			     gdouble v)
+{
+	PdfDocument	*pdfdoc = PDF_DOCUMENT(document);
+	if (!pdfdoc->scanner)
+		return;
+	printf ("pdf_sync_to_source. Page = %d, h = %d, v = %d\n",page,h,v);
+	if (synctex_edit_query (pdfdoc->scanner, page + 1, h, v) > 0) {
+		synctex_node_t node;
+		const char *filename;
+		int line, col;
+		while (node = synctex_next_result (pdfdoc->scanner)) {
+			filename = synctex_scanner_get_name(pdfdoc->scanner, synctex_node_tag (node));
+			line = synctex_node_line(node);
+			col  = synctex_node_column(node);
+			printf ("sourcefile %s at line %d, col %d\n", filename, line, col); 
+		}
+	}
+
+}
 
 static gboolean
 pdf_document_get_backend_info (EvDocument *document, EvDocumentBackendInfo *info)
@@ -885,6 +908,7 @@ pdf_document_class_init (PdfDocumentClass *klass)
 	ev_document_class->render = pdf_document_render;
 	ev_document_class->get_info = pdf_document_get_info;
 	ev_document_class->get_backend_info = pdf_document_get_backend_info;
+	ev_document_class->sync_to_source = pdf_document_sync_to_source;
 }
 
 /* EvDocumentSecurity */

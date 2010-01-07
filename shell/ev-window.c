@@ -4525,6 +4525,14 @@ attachment_bar_menu_popup_cb (EvSidebarAttachments *attachbar,
 }
 
 static void
+view_sync_source_cb (EvView   *view, int x, int y,
+		    gpointer *data)
+{
+	printf ("%d,%d\n", x,y);
+}
+
+
+static void
 ev_window_update_find_status_message (EvWindow *ev_window)
 {
 	gchar *message;
@@ -6320,9 +6328,9 @@ ev_window_init (EvWindow *ev_window)
 	g_signal_connect_object (ev_window->priv->view, "selection-changed",
 				 G_CALLBACK (view_selection_changed_cb),
 				 ev_window, 0);
-	g_signal_connect_object (ev_window->priv->view, "sync-source",
-			         G_CALLBACK (view_handle_link_cb),
-			         ev_window, 0);
+	g_signal_connect (ev_window->priv->view, "sync-source",
+			         G_CALLBACK (view_sync_source_cb),
+			         NULL);
 	gtk_widget_show (ev_window->priv->view);
 	gtk_widget_show (ev_window->priv->password_view);
 
