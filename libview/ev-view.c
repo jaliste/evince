@@ -53,6 +53,7 @@ enum {
 	SIGNAL_EXTERNAL_LINK,
 	SIGNAL_POPUP_MENU,
 	SIGNAL_SELECTION_CHANGED,
+	SIGNAL_SYNC_SOURCE,
 	N_SIGNALS
 };
 
@@ -3276,8 +3277,11 @@ ev_view_button_press_event (GtkWidget      *widget,
 			EvImage *image;
 			EvAnnotation *annot;
 			EvFormField *field;
-
-			if (EV_IS_SELECTION (view->document) && view->selection_info.selections) {
+			
+			if (event->type == GDK_2BUTTON_PRESS) {
+				ev_view_open_tex_source (view, event->x + view->scroll_x, event->y + view->scroll_y);		
+			}			
+			else if (EV_IS_SELECTION (view->document) && view->selection_info.selections) {
 				if (event->type == GDK_3BUTTON_PRESS) {
 					start_selection_for_event (view, event);
 				} else if (location_in_selected_text (view,
@@ -4273,6 +4277,22 @@ ev_view_class_init (EvViewClass *class)
 			 g_cclosure_marshal_VOID__VOID,
                          G_TYPE_NONE, 0,
                          G_TYPE_NONE);
+	signals[SIGNAL_SYNC_SOURCE] = g_signal_new ("source-sync",
+	  	         G_TYPE_FROM_CLASS (object_class),
+		         G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+		         G_STRUCT_OFFSET (EvViewClass, popup_menu),
+		         NULL, NULL,
+		         g_cclosure_marshal_VOID__OBJECT,
+		         G_TYPE_NONE, 1,
+			 G_TYPE_OBJECT);
+
+	g_object_class_install_property (object_class,
+					 PROP_HAS_SELECTION,
+					 g_param_spec_boolean ("has-selection",
+							       "Has selection",
+							       "The view has selections",
+							       FALSE,
+							       G_PARAM_READABLE));
 
 	binding_set = gtk_binding_set_by_class (class);
 
@@ -4320,6 +4340,8 @@ ev_view_init (EvView *view)
 	view->pending_scroll = SCROLL_TO_KEEP_POSITION;
 	view->jump_to_find_result = TRUE;
 	view->highlight_find_results = FALSE;
+
+	view->must_sync = FALSE;
 
 	gtk_layout_set_hadjustment (GTK_LAYOUT (view), NULL);
 	gtk_layout_set_vadjustment (GTK_LAYOUT (view), NULL);
@@ -5741,4 +5763,30 @@ ev_view_previous_page (EvView *view)
 		return FALSE;
 	}
 }
+
+static void 
+ev_view_open_tex_source (EvView *view, gint x, gint y)
+{
+	int page;
+	gint ox=0, oy=0;
+	gint docx=0, docy=0;
+	GdkRectangle page_area;
+	GtkBorder border;
+
+	find_page_at_location (view, x, y, &page, &ox, &oy);
+	if (page == -1)
+		return;
+	get_doc_point_from_offset (view, page, ox, oy, &docx, &docy);
+	get_page_extents (view, page, &page_area, &border);
+	/*(EV_DOCUMENT_GET_IFACE (view->document))->open_tex_source (view->document,
+		page,
+		(double)(x - page_area.x) / page_area.width,
+		(double)(y - page_area.y) / page_area.height,
+		docx,
+		docy,
+		view->tex_editor);
+*/
+
+}
+
 		

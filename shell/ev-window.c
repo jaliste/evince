@@ -6320,6 +6320,9 @@ ev_window_init (EvWindow *ev_window)
 	g_signal_connect_object (ev_window->priv->view, "selection-changed",
 				 G_CALLBACK (view_selection_changed_cb),
 				 ev_window, 0);
+	g_signal_connect_object (ev_window->priv->view, "sync-source",
+			         G_CALLBACK (view_handle_link_cb),
+			         ev_window, 0);
 	gtk_widget_show (ev_window->priv->view);
 	gtk_widget_show (ev_window->priv->password_view);
 
