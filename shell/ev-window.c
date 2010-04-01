@@ -6353,26 +6353,16 @@ ev_window_init (EvWindow *ev_window)
 	g_signal_connect_object (ev_window->priv->view, "handle-link",
 			         G_CALLBACK (view_handle_link_cb),
 			         ev_window, 0);
-<<<<<<< HEAD
 	g_signal_connect_object (ev_window->priv->view, "popup",
 				 G_CALLBACK (view_menu_popup_cb),
 				 ev_window, 0);
 	g_signal_connect_object (ev_window->priv->view, "selection-changed",
 				 G_CALLBACK (view_selection_changed_cb),
 				 ev_window, 0);
-	g_signal_connect (ev_window->priv->view, "sync-source",
-			         G_CALLBACK (view_sync_source_cb),
-			         NULL);
-=======
 	g_signal_connect_object (ev_window->priv->view, "sync-source",
 			         G_CALLBACK (view_sync_source_cb),
 			         ev_window, 0);
 
-	g_signal_connect_object (ev_window->priv->view,
-			         "popup",
-				 G_CALLBACK (view_menu_popup_cb),
-				 ev_window, 0);
->>>>>>> Add sync_source signal to EvWindow and export it through D-BUS
 	gtk_widget_show (ev_window->priv->view);
 	gtk_widget_show (ev_window->priv->password_view);
 

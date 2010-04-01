@@ -109,13 +109,9 @@ struct _EvDocumentClass
         cairo_surface_t * (* render)          (EvDocument      *document,
                                                EvRenderContext *rc);
         EvDocumentInfo  * (* get_info)        (EvDocument      *document);
-<<<<<<< HEAD
         gboolean          (* get_backend_info)(EvDocument      *document,
                                                EvDocumentBackendInfo *info);
-        void		  (* sync_to_source)  (EvDocument      *document,
-=======
         GList		* (* sync_to_source)  (EvDocument      *document,
->>>>>>> Add sync_source signal to EvWindow and export it through D-BUS
         				       gint 		page,
         				       gdouble		h,
         				       gdouble		v);
