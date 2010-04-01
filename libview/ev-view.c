@@ -1728,15 +1728,12 @@ ev_view_sync_source (EvView *view, gint x, gint y)
 	GdkRectangle page_area;
 	GtkBorder border;
 	gchar *str;
-	printf("TEX SOURCE %d,%d\n",x,y);
+	printf("SYNC SOURCE at %d,%d\n",x,y);
 	find_page_at_location (view, x, y, &page, &ox, &oy);
 	if (page == -1)
 		return;
 	get_doc_point_from_offset (view, page, ox, oy, &docx, &docy);
-	get_page_extents (view, page, &page_area, &border);
-	list_source = ev_document_sync_to_source (view->document, page, 
-				   (double)(x - page_area.x) / page_area.width,
-			           (double)(y - page_area.y) / page_area.height);
+	list_source = ev_document_sync_to_source (view->document, page, docx, docy);
 	if (list_source)
 	{
 		EvSourceLink *source = (EvSourceLink *)list_source->data;

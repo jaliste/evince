@@ -1,5 +1,5 @@
 <node>
-	<interface name="org.maemo.Value">
+	<interface name="org.evince.Window">
 		<signal name="sync_source">
 			<arg type="s" name="file" direction="out"/>
 			<arg type="i" name="h"	  direction="out"/>

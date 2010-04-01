@@ -846,12 +846,12 @@ pdf_document_get_info (EvDocument *document)
 static GList *
 pdf_document_sync_to_source (EvDocument *document,
 			     gint page,
-			     gdouble h, 
-			     gdouble v)
+			     gfloat h, 
+			     gfloat v)
 {
 	PdfDocument	*pdfdoc = PDF_DOCUMENT(document);
 	GList  		*ret = NULL;
-	
+	printf("pdf synctex in %f, %f\n",h,v);
 	if (!pdfdoc->scanner)
 		return NULL;
 	if (synctex_edit_query (pdfdoc->scanner, page + 1, h, v) > 0) {
@@ -862,6 +862,7 @@ pdf_document_sync_to_source (EvDocument *document,
 			source->uri = g_strdup(synctex_scanner_get_name(pdfdoc->scanner, synctex_node_tag (node)));
 			source->line = synctex_node_line(node);
 			source->col  = synctex_node_column(node);
+			printf("pdf_synctex %s,%i,%i\n",source->uri, source->line, source->col);
 			ret = g_list_prepend(ret, source);
 	
 		}

@@ -343,8 +343,8 @@ ev_document_get_page (EvDocument *document,
 GList *
 ev_document_sync_to_source (EvDocument *document,
 		      	    gint        page,
-		      	    gdouble	h,
-		      	    gdouble	v)
+		      	    gfloat	h,
+		      	    gfloat	v)
 {
 	EvDocumentClass *klass = EV_DOCUMENT_GET_CLASS (document);
 

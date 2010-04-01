@@ -113,8 +113,8 @@ struct _EvDocumentClass
                                                EvDocumentBackendInfo *info);
         GList		* (* sync_to_source)  (EvDocument      *document,
         				       gint 		page,
-        				       gdouble		h,
-        				       gdouble		v);
+        				       gfloat		h,
+        				       gfloat		v);
 };
 
 GType            ev_document_get_type             (void) G_GNUC_CONST;
@@ -166,8 +166,8 @@ gboolean         ev_document_find_page_by_label   (EvDocument      *document,
 						   gint            *page_index);
 GList *		 ev_document_sync_to_source	  (EvDocument	   *document,
 						   gint		    page,
-						   gdouble	    h,
-						   gdouble	    v);
+						   gfloat	    h,
+						   gfloat	    v);
 
 gint             ev_rect_cmp                      (EvRectangle     *a,
 					           EvRectangle     *b);
