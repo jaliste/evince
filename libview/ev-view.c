@@ -53,6 +53,7 @@ enum {
 	SIGNAL_EXTERNAL_LINK,
 	SIGNAL_POPUP_MENU,
 	SIGNAL_SELECTION_CHANGED,
+	SIGNAL_SYNC_SOURCE,
 	N_SIGNALS
 };
 
@@ -278,6 +279,7 @@ static void       ev_view_primary_get_cb                     (GtkClipboard      
 static void       ev_view_primary_clear_cb                   (GtkClipboard       *clipboard,
 							      gpointer            data);
 static void       ev_view_update_primary_selection           (EvView             *ev_view);
+
 
 G_DEFINE_TYPE (EvView, ev_view, GTK_TYPE_LAYOUT)
 
@@ -1713,6 +1715,42 @@ ev_view_handle_link (EvView *view, EvLink *link)
 			g_signal_emit (view, signals[SIGNAL_EXTERNAL_LINK], 0, action);
 			break;
 	}
+}
+
+static void 
+ev_view_sync_source (EvView *view, gint x, gint y)
+{
+	int page;
+	int x1,y1;
+	GList *list_source = NULL;
+	gint ox=0, oy=0;
+	gint docx=0, docy=0;
+	GdkRectangle page_area;
+	GtkBorder border;
+	gchar *str;
+	printf("TEX SOURCE %d,%d\n",x,y);
+	find_page_at_location (view, x, y, &page, &ox, &oy);
+	if (page == -1)
+		return;
+	get_doc_point_from_offset (view, page, ox, oy, &docx, &docy);
+	get_page_extents (view, page, &page_area, &border);
+	list_source = ev_document_sync_to_source (view->document, page, 
+				   (double)(x - page_area.x) / page_area.width,
+			           (double)(y - page_area.y) / page_area.height);
+	if (list_source)
+	{
+		EvSourceLink *source = (EvSourceLink *)list_source->data;
+		g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0,source->uri,source->line,source->col);
+	}
+	/*(EV_DOCUMENT_GET_IFACE (view->document))->open_tex_source (view->document,
+		page,
+		(double)(x - page_area.x) / page_area.width,
+		(double)(y - page_area.y) / page_area.height,
+		docx,
+		docy,
+		view->tex_editor);
+*/
+
 }
 
 static char *
@@ -3276,8 +3314,11 @@ ev_view_button_press_event (GtkWidget      *widget,
 			EvImage *image;
 			EvAnnotation *annot;
 			EvFormField *field;
-
-			if (EV_IS_SELECTION (view->document) && view->selection_info.selections) {
+			
+			if (event->type == GDK_2BUTTON_PRESS) {
+				ev_view_sync_source (view, event->x + view->scroll_x, event->y + view->scroll_y);		
+			}			
+			else if (EV_IS_SELECTION (view->document) && view->selection_info.selections) {
 				if (event->type == GDK_3BUTTON_PRESS) {
 					start_selection_for_event (view, event);
 				} else if (location_in_selected_text (view,
@@ -4273,6 +4314,17 @@ ev_view_class_init (EvViewClass *class)
 			 g_cclosure_marshal_VOID__VOID,
                          G_TYPE_NONE, 0,
                          G_TYPE_NONE);
+	signals[SIGNAL_SYNC_SOURCE] = g_signal_new ("sync-source",
+	  	         G_TYPE_FROM_CLASS (object_class),
+		         G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+		         G_STRUCT_OFFSET (EvViewClass, sync_source),
+		         NULL, NULL,
+		         ev_view_marshal_VOID__STRING_INT_INT,
+		         G_TYPE_NONE, 3,
+		         G_TYPE_STRING,
+		         G_TYPE_INT,
+		         G_TYPE_INT);
+
 
 	binding_set = gtk_binding_set_by_class (class);
 
@@ -4320,6 +4372,8 @@ ev_view_init (EvView *view)
 	view->pending_scroll = SCROLL_TO_KEEP_POSITION;
 	view->jump_to_find_result = TRUE;
 	view->highlight_find_results = FALSE;
+
+	view->must_sync = FALSE;
 
 	gtk_layout_set_hadjustment (GTK_LAYOUT (view), NULL);
 	gtk_layout_set_vadjustment (GTK_LAYOUT (view), NULL);
@@ -5146,6 +5200,32 @@ ev_view_find_set_highlight_search (EvView *view, gboolean value)
 }
 
 void
+ev_view_highlight_rect (EvView *view, EvRectangle *rect)
+{
+	gint page, n_pages;
+	gdouble width, height, scale;
+	EvPoint point;
+
+	page    = view->current_page;
+	n_pages = ev_document_get_n_pages (view->document);
+	scale   = ev_document_model_get_scale (view->model);
+	
+	/* FIXME THIS IS POSSIBLY LEAKING, AND BAD THINGS COULD HAPPEN IF A SEARCH IS IN THE MIDDLE */
+	view->find_pages = g_new0 (GList *, n_pages);
+	view->find_pages[page] = g_list_prepend ( view->find_pages[page], rect );
+	view->highlight_find_results = TRUE;
+		
+	width = (gdouble) ev_view_get_width(view) / scale;
+	height = (gdouble) ev_view_get_height(view) / scale;
+		
+	point.x = MAX (0, rect->x1 + rect->x2 - width ) / 2.0;
+	point.y = MAX (0, rect->y1 + rect->y2 - height) / 2.0;
+	view->pending_point = point;
+	view->pending_scroll = SCROLL_TO_PAGE_POSITION;
+}
+
+
+void
 ev_view_find_cancel (EvView *view)
 {
 	view->find_pages = NULL;
@@ -5741,4 +5821,7 @@ ev_view_previous_page (EvView *view)
 		return FALSE;
 	}
 }
+
+
+
 		

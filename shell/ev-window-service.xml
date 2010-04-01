@@ -1,0 +1,10 @@
+<node>
+	<interface name="org.maemo.Value">
+		<signal name="sync_source">
+			<arg type="s" name="file" direction="out"/>
+			<arg type="i" name="h"	  direction="out"/>
+			<arg type="i" name="v"	  direction="out"/>
+		</signal>
+	</interface>
+</node>
+

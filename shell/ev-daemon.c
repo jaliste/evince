@@ -74,6 +74,7 @@ G_DEFINE_TYPE(EvDaemon, ev_daemon, G_TYPE_OBJECT)
 typedef struct {
 	gchar *dbus_name;
 	gchar *uri;
+	gchar *window_path;
 } EvDoc;
 
 static void
@@ -84,7 +85,7 @@ ev_doc_free (EvDoc *doc)
 
 	g_free (doc->dbus_name);
 	g_free (doc->uri);
-
+	g_free (doc->window_path);
 	g_free (doc);
 }
 
