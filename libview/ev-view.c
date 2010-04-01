@@ -1722,21 +1722,26 @@ ev_view_sync_source (EvView *view, gint x, gint y)
 {
 	int page;
 	int x1,y1;
+	GList *list_source = NULL;
 	gint ox=0, oy=0;
 	gint docx=0, docy=0;
 	GdkRectangle page_area;
 	GtkBorder border;
+	gchar *str;
 	printf("TEX SOURCE %d,%d\n",x,y);
 	find_page_at_location (view, x, y, &page, &ox, &oy);
 	if (page == -1)
 		return;
 	get_doc_point_from_offset (view, page, ox, oy, &docx, &docy);
 	get_page_extents (view, page, &page_area, &border);
-	ev_document_sync_to_source (view->document, page, 
+	list_source = ev_document_sync_to_source (view->document, page, 
 				   (double)(x - page_area.x) / page_area.width,
 			           (double)(y - page_area.y) / page_area.height);
-	g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0, x, y);
-	
+	if (list_source)
+	{
+		EvSourceLink *source = (EvSourceLink *)list_source->data;
+		g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0,source->uri,source->line,source->col);
+	}
 	/*(EV_DOCUMENT_GET_IFACE (view->document))->open_tex_source (view->document,
 		page,
 		(double)(x - page_area.x) / page_area.width,
@@ -4314,8 +4319,9 @@ ev_view_class_init (EvViewClass *class)
 		         G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
 		         G_STRUCT_OFFSET (EvViewClass, sync_source),
 		         NULL, NULL,
-		         ev_view_marshal_VOID__INT_INT,
-		         G_TYPE_NONE, 2,
+		         ev_view_marshal_VOID__STRING_INT_INT,
+		         G_TYPE_NONE, 3,
+		         G_TYPE_STRING,
 		         G_TYPE_INT,
 		         G_TYPE_INT);
 

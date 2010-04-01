@@ -73,6 +73,12 @@ struct _EvDocumentBackendInfo
 	const gchar *version;
 };
 
+typedef struct {
+	gchar *uri;
+	int   line;
+	int   col;
+} EvSourceLink;
+
 struct _EvDocument
 {
 	GObject base;
@@ -103,9 +109,13 @@ struct _EvDocumentClass
         cairo_surface_t * (* render)          (EvDocument      *document,
                                                EvRenderContext *rc);
         EvDocumentInfo  * (* get_info)        (EvDocument      *document);
+<<<<<<< HEAD
         gboolean          (* get_backend_info)(EvDocument      *document,
                                                EvDocumentBackendInfo *info);
         void		  (* sync_to_source)  (EvDocument      *document,
+=======
+        GList		* (* sync_to_source)  (EvDocument      *document,
+>>>>>>> Add sync_source signal to EvWindow and export it through D-BUS
         				       gint 		page,
         				       gdouble		h,
         				       gdouble		v);
@@ -158,7 +168,7 @@ gboolean         ev_document_has_text_page_labels (EvDocument      *document);
 gboolean         ev_document_find_page_by_label   (EvDocument      *document,
 						   const gchar     *page_label,
 						   gint            *page_index);
-void		 ev_document_sync_to_source	  (EvDocument	   *document,
+GList *		 ev_document_sync_to_source	  (EvDocument	   *document,
 						   gint		    page,
 						   gdouble	    h,
 						   gdouble	    v);

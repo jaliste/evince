@@ -340,7 +340,7 @@ ev_document_get_page (EvDocument *document,
 	return klass->get_page (document, index);
 }
 
-void
+GList *
 ev_document_sync_to_source (EvDocument *document,
 		      	    gint        page,
 		      	    gdouble	h,

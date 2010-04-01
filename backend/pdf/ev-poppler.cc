@@ -1,7 +1,6 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; c-indent-level: 8 -*- */
 /* this file is part of evince, a gnome document viewer
  *
- * Copyright (C) 2010, Jose Aliste <jose.aliste@gmail.com>
  * Copyright (C) 2009, Juanjo Marín <juanj.marin@juntadeandalucia.es>
  * Copyright (C) 2004, Red Hat, Inc.
  *
@@ -844,28 +843,30 @@ pdf_document_get_info (EvDocument *document)
 
 	return info;
 }
-static void
+static GList *
 pdf_document_sync_to_source (EvDocument *document,
 			     gint page,
 			     gdouble h, 
 			     gdouble v)
 {
 	PdfDocument	*pdfdoc = PDF_DOCUMENT(document);
+	GList  		*ret = NULL;
+	
 	if (!pdfdoc->scanner)
-		return;
-	printf ("pdf_sync_to_source. Page = %d, h = %d, v = %d\n",page,h,v);
+		return NULL;
 	if (synctex_edit_query (pdfdoc->scanner, page + 1, h, v) > 0) {
 		synctex_node_t node;
-		const char *filename;
-		int line, col;
+		EvSourceLink *source;
 		while (node = synctex_next_result (pdfdoc->scanner)) {
-			filename = synctex_scanner_get_name(pdfdoc->scanner, synctex_node_tag (node));
-			line = synctex_node_line(node);
-			col  = synctex_node_column(node);
-			printf ("sourcefile %s at line %d, col %d\n", filename, line, col); 
+			source = g_new(EvSourceLink,1);
+			source->uri = g_strdup(synctex_scanner_get_name(pdfdoc->scanner, synctex_node_tag (node)));
+			source->line = synctex_node_line(node);
+			source->col  = synctex_node_column(node);
+			ret = g_list_prepend(ret, source);
+	
 		}
 	}
-
+	return g_list_reverse(ret);
 }
 
 static gboolean
