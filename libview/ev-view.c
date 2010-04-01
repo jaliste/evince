@@ -1734,20 +1734,10 @@ ev_view_sync_source (EvView *view, gint x, gint y)
 		return;
 	get_doc_point_from_offset (view, page, ox, oy, &docx, &docy);
 	list_source = ev_document_sync_to_source (view->document, page, docx, docy);
-	if (list_source)
-	{
-		EvSourceLink *source = (EvSourceLink *)list_source->data;
-		g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0,source->uri,source->line,source->col);
+	if (list_source) {
+		EvSourceLink *source = (EvSourceLink *) list_source->data;
+		g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0, source->uri, source->line, source->col);
 	}
-	/*(EV_DOCUMENT_GET_IFACE (view->document))->open_tex_source (view->document,
-		page,
-		(double)(x - page_area.x) / page_area.width,
-		(double)(y - page_area.y) / page_area.height,
-		docx,
-		docy,
-		view->tex_editor);
-*/
-
 }
 
 static char *
