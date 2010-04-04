@@ -4,7 +4,7 @@
 
   <interface name="org.gnome.evince.Daemon">
     <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="ev_daemon"/>
-
+    
     <method name="RegisterDocument">
        <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
        <arg type="s" name="uri" direction="in"/>
@@ -15,7 +15,12 @@
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <arg type="s" name="uri" direction="in"/>
     </method>
-
+    
+    <method name="GetViewerForUri">
+    	<annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+    	<arg type="s" name="uri" direction="in"/> 
+    	<arg type="s" name="bus_name" direction="out"/>
+    </method>
   </interface>
 
 </node>

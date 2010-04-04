@@ -65,6 +65,10 @@ static gboolean ev_daemon_register_document   (EvDaemon              *ev_daemon,
 static gboolean ev_daemon_unregister_document (EvDaemon              *ev_daemon,
 					       const gchar           *uri,
 					       DBusGMethodInvocation *context);
+static gboolean ev_daemon_get_viewer_for_uri  (EvDaemon		     *ev_daemon,
+					       const gchar           *uri,
+					       DBusGMethodInvocation *context);
+
 #include "ev-daemon-service.h"
 
 static EvDaemon *ev_daemon = NULL;
@@ -74,7 +78,6 @@ G_DEFINE_TYPE(EvDaemon, ev_daemon, G_TYPE_OBJECT)
 typedef struct {
 	gchar *dbus_name;
 	gchar *uri;
-	gchar *window_path;
 } EvDoc;
 
 static void
@@ -85,7 +88,6 @@ ev_doc_free (EvDoc *doc)
 
 	g_free (doc->dbus_name);
 	g_free (doc->uri);
-	g_free (doc->window_path);
 	g_free (doc);
 }
 
@@ -319,6 +321,24 @@ ev_daemon_unregister_document (EvDaemon              *ev_daemon,
 		ev_daemon_start_killtimer (ev_daemon);
 
 	dbus_g_method_return (method);
+
+	return TRUE;
+}
+
+static gboolean
+ev_daemon_get_viewer_for_uri  (EvDaemon		*ev_daemon,
+			      const gchar		*uri,
+			      DBusGMethodInvocation	*method)
+{
+	EvDoc *doc;
+	
+	doc = ev_daemon_find_doc (ev_daemon, uri);
+	if (!doc) {
+		dbus_g_method_return (method, NULL);
+		return TRUE;
+	}
+	
+        dbus_g_method_return (method, doc->dbus_name);
 
 	return TRUE;
 }
