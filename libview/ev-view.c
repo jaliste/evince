@@ -3917,11 +3917,13 @@ draw_rubberband (GtkWidget *widget, GdkWindow *window,
 static void
 highlight_find_results (EvView *view, int page)
 {
-	gint i, n_results = 0;
+	gint i = 0;
 
-	n_results = ev_view_find_get_n_results (view, page);
+	GList *results;
 
-	for (i = 0; i < n_results; i++) {
+	results = view->find_pages[page];
+	
+	while (results) {
 		EvRectangle *rectangle;
 		GdkRectangle view_rectangle;
 		guchar alpha;
@@ -3932,10 +3934,12 @@ highlight_find_results (EvView *view, int page)
 			alpha = 0x20;
 		}
 
-		rectangle = ev_view_find_get_result (view, page, i);
+		rectangle = results->data;
 		doc_rect_to_view_rect (view, page, rectangle, &view_rectangle);
 		draw_rubberband (GTK_WIDGET (view), view->layout.bin_window,
 				 &view_rectangle, alpha);
+		results = results->next;
+		++i;
         }
 }
 
