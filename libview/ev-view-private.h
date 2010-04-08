@@ -182,6 +182,7 @@ struct _EvView {
 	
 	/* Synctex */
 	gboolean  	must_sync;
+	GList	      **sync_rects;
 };
 
 struct _EvViewClass {

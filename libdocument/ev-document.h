@@ -115,6 +115,13 @@ struct _EvDocumentClass
         				       gint 		page,
         				       gfloat		h,
         				       gfloat		v);
+    	
+	GList 	       ** (* sync_to_view)    (EvDocument      *document,
+			  		       gchar 	       *file,
+			  		       gint 		line,
+			  		       gint 		col);
+
+        				       
 };
 
 GType            ev_document_get_type             (void) G_GNUC_CONST;
@@ -168,6 +175,11 @@ GList *		 ev_document_sync_to_source	  (EvDocument	   *document,
 						   gint		    page,
 						   gfloat	    h,
 						   gfloat	    v);
+
+GList **	 ev_document_sync_to_view 	  (EvDocument *document,
+			  			   gchar *file,
+			  			   gint line,
+			  			   gint col);
 
 gint             ev_rect_cmp                      (EvRectangle     *a,
 					           EvRectangle     *b);

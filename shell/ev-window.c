@@ -95,6 +95,8 @@
 #include "ev-progress-message-area.h"
 
 #ifdef ENABLE_DBUS
+void ev_window_sync_view (EvWindow *window, gchar *file, gint line, gint col);
+
 #include "ev-media-player-keys.h"
 #include "ev-window-service.h"
 #include "ev-marshal.h"
@@ -6481,4 +6483,19 @@ ev_window_new (void)
 					      NULL));
 
 	return ev_window;
+}
+
+void 
+ev_window_sync_view (EvWindow *window, gchar *file, gint line, gint col)
+{
+	printf("%s,%d,%d\n",file,line,col);
+	gint n_pages;
+	GList **results;
+	if (!window->priv->document)
+		return;
+	results = ev_document_sync_to_view (window->priv->document, file, line, col);
+	n_pages = ev_document_get_n_pages (window->priv->document);
+	ev_view_set_sync_rects ( EV_VIEW (window->priv->view), results);
+	
+	gtk_window_present (GTK_WINDOW (window));
 }

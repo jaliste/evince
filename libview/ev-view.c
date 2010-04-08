@@ -197,7 +197,10 @@ static void	  draw_loading_text 			     (EvView             *view,
 static void       ev_view_reload_page                        (EvView             *view,
 							      gint                page,
 							      GdkRegion          *region);
-
+static void 	  highlight_sync_rects 			     (EvView 		 *view,
+							      GList 		**page_rects,
+							      int 		  page,
+							      guchar 		  alpha);
 /*** Callbacks ***/
 static void       ev_view_change_page                        (EvView             *view,
 							      gint                new_page);
@@ -1721,17 +1724,18 @@ static void
 ev_view_sync_source (EvView *view, gint x, gint y)
 {
 	int page;
-	int x1,y1;
+	gint ox =   0, oy   = 0;
+	gint docx = 0, docy = 0;
+
 	GList *list_source = NULL;
-	gint ox=0, oy=0;
-	gint docx=0, docy=0;
-	GdkRectangle page_area;
-	GtkBorder border;
-	gchar *str;
+
 	printf("SYNC SOURCE at %d,%d\n",x,y);
+
 	find_page_at_location (view, x, y, &page, &ox, &oy);
+
 	if (page == -1)
 		return;
+
 	get_doc_point_from_offset (view, page, ox, oy, &docx, &docy);
 	list_source = ev_document_sync_to_source (view->document, page, docx, docy);
 	if (list_source) {
@@ -3104,6 +3108,9 @@ ev_view_expose_event (GtkWidget      *widget,
 
 		if (page_ready && view->find_pages && view->highlight_find_results)
 			highlight_find_results (view, i);
+		if (page_ready && view->sync_rects)
+			highlight_sync_rects (view, view->sync_rects,i, 0x20);
+
 		if (page_ready && EV_IS_DOCUMENT_ANNOTATIONS (view->document))
 			show_annotation_windows (view, i);
 	}
@@ -3924,7 +3931,6 @@ highlight_find_results (EvView *view, int page)
 	results = view->find_pages[page];
 	
 	while (results) {
-		EvRectangle *rectangle;
 		GdkRectangle view_rectangle;
 		guchar alpha;
 
@@ -3934,13 +3940,30 @@ highlight_find_results (EvView *view, int page)
 			alpha = 0x20;
 		}
 
-		rectangle = results->data;
-		doc_rect_to_view_rect (view, page, rectangle, &view_rectangle);
+		doc_rect_to_view_rect (view, page, (EvRectangle *) results->data, &view_rectangle);
 		draw_rubberband (GTK_WIDGET (view), view->layout.bin_window,
 				 &view_rectangle, alpha);
-		results = results->next;
+		results = g_list_next(results);
 		++i;
         }
+}
+static void
+highlight_sync_rects (EvView *view, GList **page_rects, int page, guchar alpha)
+{
+	printf("Highlight\n");
+	GList *rects;
+	if (!page_rects)
+		return;
+	/*FIXME WE need to ensure that if page_rects is not NULL, then it's a proper pointer array, maybe we should use 
+  		GPtrArray instead since the page_rects can be I don't know what... */
+	rects = page_rects[page];
+	while (rects) {
+		printf("drawing rectangle \n");
+		GdkRectangle view_rectangle;
+		doc_rect_to_view_rect (view, page, (EvRectangle *) rects->data, &view_rectangle);
+		draw_rubberband (GTK_WIDGET (view), view->layout.bin_window, &view_rectangle, 0x20);
+		rects = g_list_next(rects);	
+	}
 }
 
 static void
@@ -5128,6 +5151,12 @@ jump_to_find_page (EvView *view, EvViewFindDirection direction, gint shift)
 	}
 }
 
+void
+ev_view_set_sync_rects (EvView *view, GList **rects)
+{
+	view->sync_rects = rects;
+}
+ 
 void
 ev_view_find_changed (EvView *view, GList **results, gint page)
 {

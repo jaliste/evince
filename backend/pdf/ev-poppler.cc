@@ -857,7 +857,7 @@ pdf_document_sync_to_source (EvDocument *document,
 	if (synctex_edit_query (pdfdoc->scanner, page + 1, h, v) > 0) {
 		synctex_node_t node;
 		EvSourceLink *source;
-		while (node = synctex_next_result (pdfdoc->scanner)) {
+		while ((node = synctex_next_result (pdfdoc->scanner))) {
 			source = g_new(EvSourceLink,1);
 			source->uri = g_strdup(synctex_scanner_get_name(pdfdoc->scanner, synctex_node_tag (node)));
 			source->line = synctex_node_line(node);
@@ -869,6 +869,35 @@ pdf_document_sync_to_source (EvDocument *document,
 	}
 	return g_list_reverse(ret);
 }
+static GList **
+pdf_document_sync_to_view (EvDocument *document, gchar *file, gint line, gint col)
+{
+	PdfDocument	*pdfdoc = PDF_DOCUMENT(document);
+	EvRectangle	*rec = NULL;
+	GList		**result;
+	gint		n_pages, page;
+	if (!pdfdoc->scanner)
+		return NULL;
+	n_pages = pdf_document_get_n_pages (document);
+	result = g_new0 (GList *, n_pages);
+
+	if (synctex_display_query(pdfdoc->scanner, file , line, col)>0) {
+		synctex_node_t node;
+		while ((node = synctex_next_result (pdfdoc->scanner))) { 
+			rec = g_new (EvRectangle, 1);
+			page = synctex_node_page (node);
+			rec->x1 = synctex_node_box_visible_h(node);
+			rec->y1 = synctex_node_box_visible_v (node) - synctex_node_box_visible_height(node);
+			
+			rec->x2 = synctex_node_box_visible_width(node) + rec->x1;
+			rec->y2 = synctex_node_box_visible_depth(node)  + 
+				  synctex_node_box_visible_height(node) + rec->y1;
+			printf("Page %d, rec = %f,%f,%f,%f\n",page,rec->x1,rec->y1,rec->x2,rec->y2);
+			result[page] = g_list_prepend (result[page], rec);	
+		}
+	}
+	return result;
+} 
 
 static gboolean
 pdf_document_get_backend_info (EvDocument *document, EvDocumentBackendInfo *info)
@@ -911,6 +940,8 @@ pdf_document_class_init (PdfDocumentClass *klass)
 	ev_document_class->get_info = pdf_document_get_info;
 	ev_document_class->get_backend_info = pdf_document_get_backend_info;
 	ev_document_class->sync_to_source = pdf_document_sync_to_source;
+	ev_document_class->sync_to_view = pdf_document_sync_to_view;
+	
 }
 
 /* EvDocumentSecurity */

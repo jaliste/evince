@@ -351,6 +351,17 @@ ev_document_sync_to_source (EvDocument *document,
 	return klass->sync_to_source (document, page, h, v);
 }
 
+GList **
+ev_document_sync_to_view (EvDocument *document,
+			  gchar *file,
+			  gint line,
+			  gint col)
+{
+	EvDocumentClass *klass = EV_DOCUMENT_GET_CLASS (document);
+
+	return klass->sync_to_view (document, file, line, col);
+}
+
 static gint
 _ev_document_get_n_pages (EvDocument  *document)
 {

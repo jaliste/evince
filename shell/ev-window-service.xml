@@ -1,10 +1,15 @@
 <node>
-	<interface name="org.evince.Window">
+	<interface name="org.gnome.evince.Window">
 		<signal name="sync_source">
 			<arg type="s" name="file" direction="out"/>
 			<arg type="i" name="h"	  direction="out"/>
 			<arg type="i" name="v"	  direction="out"/>
 		</signal>
+		<method name="sync_view">
+			<arg type="s" name="input_file" direction="in"/>
+			<arg type="i" name="line" direction="in"/>
+			<arg type="i" name="col"  direction="in"/>
+		</method>
 	</interface>
 </node>
 
