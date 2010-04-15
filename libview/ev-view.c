@@ -201,6 +201,7 @@ static void 	  highlight_sync_rects 			     (EvView 		 *view,
 							      GList 		**page_rects,
 							      int 		  page,
 							      guchar 		  alpha);
+
 /*** Callbacks ***/
 static void       ev_view_change_page                        (EvView             *view,
 							      gint                new_page);
@@ -282,7 +283,6 @@ static void       ev_view_primary_get_cb                     (GtkClipboard      
 static void       ev_view_primary_clear_cb                   (GtkClipboard       *clipboard,
 							      gpointer            data);
 static void       ev_view_update_primary_selection           (EvView             *ev_view);
-
 
 G_DEFINE_TYPE (EvView, ev_view, GTK_TYPE_LAYOUT)
 
@@ -1720,7 +1720,7 @@ ev_view_handle_link (EvView *view, EvLink *link)
 	}
 }
 
-static void 
+static void
 ev_view_sync_source (EvView *view, gint x, gint y)
 {
 	int page;
@@ -1729,18 +1729,15 @@ ev_view_sync_source (EvView *view, gint x, gint y)
 
 	GList *list_source = NULL;
 
-	printf("SYNC SOURCE at %d,%d\n",x,y);
-
 	find_page_at_location (view, x, y, &page, &ox, &oy);
-
 	if (page == -1)
 		return;
-
 	get_doc_point_from_offset (view, page, ox, oy, &docx, &docy);
 	list_source = ev_document_sync_to_source (view->document, page, docx, docy);
 	if (list_source) {
 		EvSourceLink *source = (EvSourceLink *) list_source->data;
 		g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0, source->uri, source->line, source->col);
+		
 	}
 }
 
@@ -3308,10 +3305,10 @@ ev_view_button_press_event (GtkWidget      *widget,
 			EvImage *image;
 			EvAnnotation *annot;
 			EvFormField *field;
-			
+
 			if (event->type == GDK_2BUTTON_PRESS) {
-				ev_view_sync_source (view, event->x + view->scroll_x, event->y + view->scroll_y);		
-			}			
+				ev_view_sync_source (view, event->x + view->scroll_x, event->y + view->scroll_y);
+			}
 			else if (EV_IS_SELECTION (view->document) && view->selection_info.selections) {
 				if (event->type == GDK_3BUTTON_PRESS) {
 					start_selection_for_event (view, event);
@@ -3924,13 +3921,12 @@ draw_rubberband (GtkWidget *widget, GdkWindow *window,
 static void
 highlight_find_results (EvView *view, int page)
 {
-	gint i = 0;
+	gint i, n_results = 0;
 
-	GList *results;
+	n_results = ev_view_find_get_n_results (view, page);
 
-	results = view->find_pages[page];
-	
-	while (results) {
+	for (i = 0; i < n_results; i++) {
+		EvRectangle *rectangle;
 		GdkRectangle view_rectangle;
 		guchar alpha;
 
@@ -3940,17 +3936,16 @@ highlight_find_results (EvView *view, int page)
 			alpha = 0x20;
 		}
 
-		doc_rect_to_view_rect (view, page, (EvRectangle *) results->data, &view_rectangle);
+		rectangle = ev_view_find_get_result (view, page, i);
+		doc_rect_to_view_rect (view, page, rectangle, &view_rectangle);
 		draw_rubberband (GTK_WIDGET (view), view->layout.bin_window,
 				 &view_rectangle, alpha);
-		results = g_list_next(results);
-		++i;
         }
 }
+
 static void
 highlight_sync_rects (EvView *view, GList **page_rects, int page, guchar alpha)
 {
-	printf("Highlight\n");
 	GList *rects;
 	if (!page_rects)
 		return;
@@ -4625,8 +4620,6 @@ ev_view_document_changed_cb (EvDocumentModel *model,
 {
 	EvDocument *document = ev_document_model_get_document (model);
 
-	view->loading = FALSE;
-
 	if (document != view->document) {
 		gint current_page;
 
@@ -4640,6 +4633,7 @@ ev_view_document_changed_cb (EvDocumentModel *model,
 		view->find_result = 0;
 
 		if (view->document) {
+			view->loading = FALSE;
 			g_object_ref (view->document);
 			setup_caches (view);
                 }
@@ -5156,7 +5150,7 @@ ev_view_set_sync_rects (EvView *view, GList **rects)
 {
 	view->sync_rects = rects;
 }
- 
+
 void
 ev_view_find_changed (EvView *view, GList **results, gint page)
 {
@@ -5218,32 +5212,6 @@ ev_view_find_set_highlight_search (EvView *view, gboolean value)
 	view->highlight_find_results = value;
 	gtk_widget_queue_draw (GTK_WIDGET (view));
 }
-
-void
-ev_view_highlight_rect (EvView *view, EvRectangle *rect)
-{
-	gint page, n_pages;
-	gdouble width, height, scale;
-	EvPoint point;
-
-	page    = view->current_page;
-	n_pages = ev_document_get_n_pages (view->document);
-	scale   = ev_document_model_get_scale (view->model);
-	
-	/* FIXME THIS IS POSSIBLY LEAKING, AND BAD THINGS COULD HAPPEN IF A SEARCH IS IN THE MIDDLE */
-	view->find_pages = g_new0 (GList *, n_pages);
-	view->find_pages[page] = g_list_prepend ( view->find_pages[page], rect );
-	view->highlight_find_results = TRUE;
-		
-	width = (gdouble) ev_view_get_width(view) / scale;
-	height = (gdouble) ev_view_get_height(view) / scale;
-		
-	point.x = MAX (0, rect->x1 + rect->x2 - width ) / 2.0;
-	point.y = MAX (0, rect->y1 + rect->y2 - height) / 2.0;
-	view->pending_point = point;
-	view->pending_scroll = SCROLL_TO_PAGE_POSITION;
-}
-
 
 void
 ev_view_find_cancel (EvView *view)
@@ -5842,6 +5810,3 @@ ev_view_previous_page (EvView *view)
 	}
 }
 
-
-
-		
