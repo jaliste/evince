@@ -382,7 +382,6 @@ ev_document_sync_to_source (EvDocument *document,
 	g_return_val_if_fail (EV_IS_DOCUMENT (document), NULL);
 
 	GList *ret = NULL;
-	gint   n_links;
 	
 	if (!document->priv->synctex_scanner)
 		return NULL;
@@ -390,7 +389,6 @@ ev_document_sync_to_source (EvDocument *document,
 	if (synctex_edit_query (document->priv->synctex_scanner, page + 1, x, y) > 0) {
 		synctex_node_t node;
 		EvSourceLink *source;
-//		GArray      *source_array = g_array_sized_new (FALSE, FALSE, sizeof (EvSourceLink), PL_LEN);
 
 		while ((node = synctex_next_result (document->priv->synctex_scanner))) {
 			source = g_new (EvSourceLink, 1);

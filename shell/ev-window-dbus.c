@@ -49,42 +49,9 @@ enum {
 
 static guint signals[N_SIGNALS];
 
-#define EV_WINDOW_GET_PRIVATE(object) \
-	(G_TYPE_INSTANCE_GET_PRIVATE ((object), EV_TYPE_WINDOW, EvWindowPrivate))
-
-#define EV_WINDOW_IS_PRESENTATION(w) (w->priv->presentation_view != NULL)
-
-#define PAGE_SELECTOR_ACTION	"PageSelector"
-#define ZOOM_CONTROL_ACTION	"ViewZoom"
-#define NAVIGATION_ACTION	"Navigation"
-
-#define GCONF_LOCKDOWN_DIR          "/desktop/gnome/lockdown"
-#define GCONF_OVERRIDE_RESTRICTIONS "/apps/evince/override_restrictions"
-#define GCONF_LOCKDOWN_SAVE         "/desktop/gnome/lockdown/disable_save_to_disk"
-#define GCONF_LOCKDOWN_PRINT        "/desktop/gnome/lockdown/disable_printing"
-#define GCONF_LOCKDOWN_PRINT_SETUP  "/desktop/gnome/lockdown/disable_print_setup"
-
-#define SIDEBAR_DEFAULT_SIZE    132
-#define LINKS_SIDEBAR_ID "links"
-#define THUMBNAILS_SIDEBAR_ID "thumbnails"
-#define ATTACHMENTS_SIDEBAR_ID "attachments"
-#define LAYERS_SIDEBAR_ID "layers"
-
-#define EV_PRINT_SETTINGS_FILE  "print-settings"
-#define EV_PRINT_SETTINGS_GROUP "Print Settings"
-#define EV_PAGE_SETUP_GROUP     "Page Setup"
-
-#define EV_TOOLBARS_FILENAME "evince-toolbar.xml"
-
-#define MIN_SCALE 0.05409
-#define MAX_SCALE 4.0
-
-
-
-
 G_DEFINE_TYPE (EvWindowDBus, ev_window_dbus, EV_TYPE_WINDOW)
 
-#define WINDOW_DBUS_OBJECT_PATH "/org/gnome/evince/Evince/Window"
+#define WINDOW_DBUS_OBJECT_PATH "/org/gnome/evince/Window"
 #define WINDOW_DBUS_INTERFACE   "org.gnome.evince.Window"
 #define DBUS_TYPE_SOURCE_LINK (dbus_g_type_get_struct ("GValueArray", G_TYPE_STRING, G_TYPE_INT, G_TYPE_INT, G_TYPE_INVALID))
 #define DBUS_TYPE_SOURCE_LINK_ARRAY (dbus_g_type_get_collection ("GPtrArray", DBUS_TYPE_SOURCE_LINK))
@@ -96,27 +63,29 @@ view_sync_source_cb (EvView   *view, gpointer data,
 {
 	GList *list_source = (GList *) data;
 	GList *list = list_source;
-	
 	GPtrArray * array = g_ptr_array_new();
-	
+
 	while (list_source != NULL) {
 		GValue *value;
 		EvSourceLink 	*source;
+
 		source = (EvSourceLink *) list_source->data;
 		value = g_new0 (GValue, 1);
-
-      		g_value_init (value, DBUS_TYPE_SOURCE_LINK);
-       		g_value_take_boxed (value, dbus_g_type_specialized_construct (DBUS_TYPE_SOURCE_LINK));
-
+		g_value_init (value, DBUS_TYPE_SOURCE_LINK);
+		g_value_take_boxed (value, dbus_g_type_specialized_construct (DBUS_TYPE_SOURCE_LINK));
       		dbus_g_type_struct_set (value, 0, source->uri, 1, source->line, 2, source->col, G_MAXUINT);
       		g_ptr_array_add (array, g_value_get_boxed (value));
-      		//g_free (value);
-      		//g_free (source->uri);
-      		//g_free (source);
-		list_source = g_list_next(list_source);
+
+		g_free (source->uri);
+		g_free (source);
+		g_free (value);
+
+		list_source = g_list_next (list_source);
 	}
-	//g_list_free (list);
+
 	g_signal_emit (ev_window, signals[SIGNAL_SYNC_SOURCE], 0, array);
+	g_list_free (list);
+	g_ptr_array_free (array, TRUE);
 }
 
 static void
@@ -163,11 +132,9 @@ ev_window_dbus_init (EvWindowDBus *ev_window)
 	gchar path[100];
 	GError *error = NULL;
 	connection = dbus_g_bus_get (DBUS_BUS_STARTER, &error);
-	g_sprintf(path,"%s/%d",WINDOW_DBUS_OBJECT_PATH, count);
+	g_sprintf (path, "%s/%d", WINDOW_DBUS_OBJECT_PATH, count);
 	if (connection) {
-		dbus_g_connection_register_g_object (connection,
-					 path,
-					     G_OBJECT (ev_window));
+		dbus_g_connection_register_g_object (connection, path, G_OBJECT (ev_window));
 		count++;
 	}
 }
