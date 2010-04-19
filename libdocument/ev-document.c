@@ -396,11 +396,11 @@ ev_document_sync_to_source (EvDocument *document,
 									 synctex_node_tag (node)));
 			source->line = synctex_node_line (node);
 			source->col  = synctex_node_column (node);
-			ret = g_list_prepend(ret, source);
+			ret = g_list_prepend (ret, source);
 		}
 	}
 
-	return g_list_reverse(ret);
+	return g_list_reverse (ret);
 }
 
 GList **

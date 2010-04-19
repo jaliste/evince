@@ -88,6 +88,7 @@ ev_doc_free (EvDoc *doc)
 
 	g_free (doc->dbus_name);
 	g_free (doc->uri);
+
 	g_free (doc);
 }
 
