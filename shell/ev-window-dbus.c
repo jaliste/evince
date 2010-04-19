@@ -1,15 +1,10 @@
 /* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; c-indent-level: 8 -*- */
 /* this file is part of evince, a gnome document viewer
  *
- *  Copyright (C) 2009 Juanjo Marín <juanj.marin@juntadeandalucia.es>
- *  Copyright (C) 2008 Carlos Garcia Campos
- *  Copyright (C) 2004 Martin Kretzschmar
- *  Copyright (C) 2004 Red Hat, Inc.
- *  Copyright (C) 2000, 2001, 2002, 2003, 2004 Marco Pesenti Gritti
- *  Copyright © 2003, 2004, 2005, 2009 Christian Persch
+ *  Copyright (C) 2010 Jose Aliste 
  *
  *  Author:
- *    Martin Kretzschmar <martink@gnome.org>
+ *    Jose Aliste <jose.aliste@gmail.com>
  *
  * Evince is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -40,60 +35,8 @@
 #include <gio/gio.h>
 #include <gtk/gtk.h>
 
-#ifdef WITH_GCONF
-#include <gconf/gconf-client.h>
-#endif
-
-#include "egg-editable-toolbar.h"
-#include "egg-toolbar-editor.h"
-#include "egg-toolbars-model.h"
-
-#include "eggfindbar.h"
-
-#include "ephy-zoom-action.h"
-#include "ephy-zoom.h"
-
-#include "ev-application.h"
-#include "ev-document-factory.h"
-#include "ev-document-find.h"
-#include "ev-document-fonts.h"
-#include "ev-document-images.h"
-#include "ev-document-links.h"
-#include "ev-document-thumbnails.h"
-#include "ev-document-annotations.h"
-#include "ev-document-type-builtins.h"
-#include "ev-document-misc.h"
-#include "ev-file-exporter.h"
-#include "ev-file-helpers.h"
-#include "ev-file-monitor.h"
-#include "ev-history.h"
-#include "ev-image.h"
-#include "ev-job-scheduler.h"
-#include "ev-jobs.h"
-#include "ev-message-area.h"
-#include "ev-metadata.h"
-#include "ev-navigation-action.h"
-#include "ev-open-recent-action.h"
-#include "ev-page-action.h"
-#include "ev-password-view.h"
-#include "ev-properties-dialog.h"
-#include "ev-sidebar-attachments.h"
-#include "ev-sidebar.h"
-#include "ev-sidebar-links.h"
-#include "ev-sidebar-page.h"
-#include "ev-sidebar-thumbnails.h"
-#include "ev-sidebar-layers.h"
-#include "ev-stock-icons.h"
-#include "ev-utils.h"
-#include "ev-keyring.h"
-#include "ev-view.h"
-#include "ev-view-presentation.h"
-#include "ev-view-type-builtins.h"
 #include "ev-window.h"
 #include "ev-window-dbus.h"
-#include "ev-window-title.h"
-#include "ev-print-operation.h"
-#include "ev-progress-message-area.h"
 
 void ev_window_dbus_sync_view (EvWindow *window, gchar *file, gint line, gint col);
 #include "ev-window-service.h"
@@ -143,13 +86,37 @@ G_DEFINE_TYPE (EvWindowDBus, ev_window_dbus, EV_TYPE_WINDOW)
 
 #define WINDOW_DBUS_OBJECT_PATH "/org/gnome/evince/Evince/Window"
 #define WINDOW_DBUS_INTERFACE   "org.gnome.evince.Window"
+#define DBUS_TYPE_SOURCE_LINK (dbus_g_type_get_struct ("GValueArray", G_TYPE_STRING, G_TYPE_INT, G_TYPE_INT, G_TYPE_INVALID))
+#define DBUS_TYPE_SOURCE_LINK_ARRAY (dbus_g_type_get_collection ("GPtrArray", DBUS_TYPE_SOURCE_LINK))
+
 
 static void
-view_sync_source_cb (EvView   *view, gchar *file_uri, int x, int y,
+view_sync_source_cb (EvView   *view, gpointer data,
 		    EvWindowDBus *ev_window)
 {
-	printf("Hola, %s,%d,%d\n",file_uri,x,y);
-	g_signal_emit (ev_window, signals[SIGNAL_SYNC_SOURCE], 0, file_uri, x, y);
+	GList *list_source = (GList *) data;
+	GList *list = list_source;
+	
+	GPtrArray * array = g_ptr_array_new();
+	
+	while (list_source != NULL) {
+		GValue *value;
+		EvSourceLink 	*source;
+		source = (EvSourceLink *) list_source->data;
+		value = g_new0 (GValue, 1);
+
+      		g_value_init (value, DBUS_TYPE_SOURCE_LINK);
+       		g_value_take_boxed (value, dbus_g_type_specialized_construct (DBUS_TYPE_SOURCE_LINK));
+
+      		dbus_g_type_struct_set (value, 0, source->uri, 1, source->line, 2, source->col, G_MAXUINT);
+      		g_ptr_array_add (array, g_value_get_boxed (value));
+      		//g_free (value);
+      		//g_free (source->uri);
+      		//g_free (source);
+		list_source = g_list_next(list_source);
+	}
+	//g_list_free (list);
+	g_signal_emit (ev_window, signals[SIGNAL_SYNC_SOURCE], 0, array);
 }
 
 static void
@@ -173,11 +140,9 @@ ev_window_dbus_class_init (EvWindowDBusClass *ev_window_class)
 		         G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
 		         0,
 		         NULL, NULL,
-		         ev_marshal_VOID__STRING_INT_INT,
-		         G_TYPE_NONE, 3,
-		         G_TYPE_STRING,
-		         G_TYPE_INT,
-		         G_TYPE_INT);
+		         g_cclosure_marshal_VOID__POINTER,
+		         G_TYPE_NONE, 1,
+		         DBUS_TYPE_SOURCE_LINK_ARRAY);
 	dbus_g_object_type_install_info (EV_TYPE_WINDOW_DBUS,
 					 &dbus_glib_ev_window_object_info);
 	g_object_class->dispose = ev_window_dbus_dispose;
@@ -188,10 +153,8 @@ ev_window_dbus_class_init (EvWindowDBusClass *ev_window_class)
 static void
 ev_window_dbus_init (EvWindowDBus *ev_window)
 {
-	printf("dbus_init\n");
 	EvWindow *window = EV_WINDOW (ev_window);
 	EvView 	 *view   = EV_VIEW (ev_window_get_view (window));
-	printf("view %p\n",view);
 	g_signal_connect_object (view, "sync-source",
 			         G_CALLBACK (view_sync_source_cb),
 			         ev_window, 0);

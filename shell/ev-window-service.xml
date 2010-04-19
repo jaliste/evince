@@ -2,9 +2,7 @@
 	<interface name="org.gnome.evince.Window">
 		<annotation name="org.freedesktop.DBus.GLib.CSymbol" value="ev_window_dbus"/>
 		<signal name="sync_source">
-			<arg type="s" name="file" direction="out"/>
-			<arg type="i" name="h"	  direction="out"/>
-			<arg type="i" name="v"	  direction="out"/>
+			<arg type="a(sii)" name="source_links" direction="out"/>
 		</signal>
 		<method name="sync_view">
 			<arg type="s" name="input_file" direction="in"/>

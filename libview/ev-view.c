@@ -1737,10 +1737,9 @@ ev_view_sync_source (EvView *view, gint x, gint y)
 		return;
 	get_doc_point_from_offset (view, page, ox, oy, &docx, &docy);
 	list_source = ev_document_sync_to_source (view->document, page, docx, docy);
-	if (list_source) {
-		EvSourceLink *source = (EvSourceLink *) list_source->data;
-		g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0, source->uri, source->line, source->col);		
-	}
+	if (list_source)
+		g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0, list_source);
+
 }
 
 static char *
@@ -3954,11 +3953,10 @@ highlight_sync_rects (EvView *view, GList **page_rects, int page, guchar alpha)
   		GPtrArray instead since the page_rects can be I don't know what... */
 	rects = page_rects[page];
 	while (rects) {
-		printf("drawing rectangle \n");
 		GdkRectangle view_rectangle;
 		doc_rect_to_view_rect (view, page, (EvRectangle *) rects->data, &view_rectangle);
 		draw_rubberband (GTK_WIDGET (view), view->layout.bin_window, &view_rectangle, 0x20);
-		rects = g_list_next(rects);	
+		rects = g_list_next (rects);
 	}
 }
 
@@ -4329,12 +4327,9 @@ ev_view_class_init (EvViewClass *class)
 		         G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
 		         G_STRUCT_OFFSET (EvViewClass, sync_source),
 		         NULL, NULL,
-		         ev_view_marshal_VOID__STRING_INT_INT,
-		         G_TYPE_NONE, 3,
-		         G_TYPE_STRING,
-		         G_TYPE_INT,
-		         G_TYPE_INT);
-
+		         g_cclosure_marshal_VOID__POINTER,
+		         G_TYPE_NONE, 1,
+		         G_TYPE_POINTER);
 
 	binding_set = gtk_binding_set_by_class (class);
 
