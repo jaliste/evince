@@ -55,7 +55,6 @@
 #include "ev-transition-effect.h"
 #include "ev-attachment.h"
 #include "ev-image.h"
-#include "synctex_parser.h"
 
 #include <libxml/tree.h>
 #include <libxml/parser.h>
@@ -119,10 +118,8 @@ struct _PdfDocument
 
 	PdfDocumentSearch *search;
 	PdfPrintContext *print_ctx;
-	
+
 	GList *layers;
-	int synctex_enabled;
-	synctex_scanner_t scanner;
 };
 
 static void pdf_document_security_iface_init             (EvDocumentSecurityIface    *iface);
@@ -244,9 +241,6 @@ pdf_document_dispose (GObject *object)
 		g_list_foreach (pdf_document->layers, (GFunc)g_object_unref, NULL);
 		g_list_free (pdf_document->layers);
 	}
-	if (pdf_document->scanner) {
-		synctex_scanner_free(pdf_document->scanner);
-	}
 
 	G_OBJECT_CLASS (pdf_document_parent_class)->dispose (object);
 }
@@ -313,10 +307,9 @@ pdf_document_load (EvDocument   *document,
 		   const char   *uri,
 		   GError      **error)
 {
-	gchar *tmp;
 	GError *poppler_error = NULL;
 	PdfDocument *pdf_document = PDF_DOCUMENT (document);
-	
+
 	pdf_document->document =
 		poppler_document_new_from_file (uri, pdf_document->password, &poppler_error);
 
@@ -324,14 +317,7 @@ pdf_document_load (EvDocument   *document,
 		convert_error (poppler_error, error);
 		return FALSE;
 	}
-	
-	tmp = g_strdup(uri);
-	if (uri != NULL) {
-		pdf_document->scanner = synctex_scanner_new_with_output_file(tmp+7, NULL, 1);
-		if (pdf_document->scanner) { 
-			synctex_scanner_display(pdf_document->scanner);
-		}
-	}
+
 	return TRUE;
 }
 
@@ -843,61 +829,6 @@ pdf_document_get_info (EvDocument *document)
 
 	return info;
 }
-static GList *
-pdf_document_sync_to_source (EvDocument *document,
-			     gint page,
-			     gfloat h, 
-			     gfloat v)
-{
-	PdfDocument	*pdfdoc = PDF_DOCUMENT(document);
-	GList  		*ret = NULL;
-	printf("pdf synctex in %f, %f\n",h,v);
-	if (!pdfdoc->scanner)
-		return NULL;
-	if (synctex_edit_query (pdfdoc->scanner, page + 1, h, v) > 0) {
-		synctex_node_t node;
-		EvSourceLink *source;
-		while ((node = synctex_next_result (pdfdoc->scanner))) {
-			source = g_new(EvSourceLink,1);
-			source->uri = g_strdup(synctex_scanner_get_name(pdfdoc->scanner, synctex_node_tag (node)));
-			source->line = synctex_node_line(node);
-			source->col  = synctex_node_column(node);
-			printf("pdf_synctex %s,%i,%i\n",source->uri, source->line, source->col);
-			ret = g_list_prepend(ret, source);
-	
-		}
-	}
-	return g_list_reverse(ret);
-}
-static GList **
-pdf_document_sync_to_view (EvDocument *document, gchar *file, gint line, gint col)
-{
-	PdfDocument	*pdfdoc = PDF_DOCUMENT(document);
-	EvRectangle	*rec = NULL;
-	GList		**result;
-	gint		n_pages, page;
-	if (!pdfdoc->scanner)
-		return NULL;
-	n_pages = pdf_document_get_n_pages (document);
-	result = g_new0 (GList *, n_pages);
-
-	if (synctex_display_query(pdfdoc->scanner, file , line, col)>0) {
-		synctex_node_t node;
-		while ((node = synctex_next_result (pdfdoc->scanner))) { 
-			rec = g_new (EvRectangle, 1);
-			page = synctex_node_page (node);
-			rec->x1 = synctex_node_box_visible_h(node);
-			rec->y1 = synctex_node_box_visible_v (node) - synctex_node_box_visible_height(node);
-			
-			rec->x2 = synctex_node_box_visible_width(node) + rec->x1;
-			rec->y2 = synctex_node_box_visible_depth(node)  + 
-				  synctex_node_box_visible_height(node) + rec->y1;
-			printf("Page %d, rec = %f,%f,%f,%f\n",page,rec->x1,rec->y1,rec->x2,rec->y2);
-			result[page] = g_list_prepend (result[page], rec);	
-		}
-	}
-	return result;
-} 
 
 static gboolean
 pdf_document_get_backend_info (EvDocument *document, EvDocumentBackendInfo *info)
@@ -922,6 +853,12 @@ pdf_document_get_backend_info (EvDocument *document, EvDocumentBackendInfo *info
 	return TRUE;
 }
 
+static gboolean
+pdf_document_synctex_enabled (EvDocument *doc)
+{
+	return TRUE;
+}
+
 static void
 pdf_document_class_init (PdfDocumentClass *klass)
 {
@@ -939,9 +876,7 @@ pdf_document_class_init (PdfDocumentClass *klass)
 	ev_document_class->render = pdf_document_render;
 	ev_document_class->get_info = pdf_document_get_info;
 	ev_document_class->get_backend_info = pdf_document_get_backend_info;
-	ev_document_class->sync_to_source = pdf_document_sync_to_source;
-	ev_document_class->sync_to_view = pdf_document_sync_to_view;
-	
+	ev_document_class->synctex_enabled = pdf_document_synctex_enabled;
 }
 
 /* EvDocumentSecurity */

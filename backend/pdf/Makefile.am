@@ -1,12 +1,11 @@
-INCLUDES =						\
-	-I$(top_srcdir)					\
-	-I$(top_srcdir)/libdocument			\
-	-I$(top_srcdir)/cut-n-paste/synctex 		\
-	-DGNOMELOCALEDIR=\"$(datadir)/locale\"  	\
-	-DEVINCE_COMPILATION				\
-	$(BACKEND_CFLAGS)				\
-	$(POPPLER_CFLAGS)                       	\
-	$(WARN_CXXFLAGS)				\
+INCLUDES =					\
+	-I$(top_srcdir)				\
+	-I$(top_srcdir)/libdocument		\
+	-DGNOMELOCALEDIR=\"$(datadir)/locale\"  \
+	-DEVINCE_COMPILATION			\
+	$(BACKEND_CFLAGS)			\
+	$(POPPLER_CFLAGS)                       \
+	$(WARN_CXXFLAGS)			\
 	$(DISABLE_DEPRECATED)
 
 backend_LTLIBRARIES = libpdfdocument.la
@@ -18,7 +17,6 @@ libpdfdocument_la_SOURCES =			\
 libpdfdocument_la_LDFLAGS = $(BACKEND_LIBTOOL_FLAGS)
 libpdfdocument_la_LIBADD =				\
 	$(top_builddir)/libdocument/libevdocument.la	\
-	$(top_builddir)/cut-n-paste/synctex/libsynctex.la \
 	$(BACKEND_LIBS)					\
 	$(POPPLER_LIBS)					\
 	$(CAIRO_PDF_LIBS)				\

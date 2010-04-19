@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include "ev-document.h"
+#include "synctex_parser.h"
 
 #define EV_DOCUMENT_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), EV_TYPE_DOCUMENT, EvDocumentPrivate))
 
@@ -51,6 +52,8 @@ struct _EvDocumentPrivate
 	gchar         **page_labels;
 	EvPageSize     *page_sizes;
 	EvDocumentInfo *info;
+
+	synctex_scanner_t synctex_scanner;
 };
 
 static gint            _ev_document_get_n_pages   (EvDocument  *document);
@@ -118,6 +121,9 @@ ev_document_finalize (GObject *object)
 	if (document->priv->info) {
 		ev_document_info_free (document->priv->info);
 		document->priv->info = NULL;
+	}
+	if (document->priv->synctex_scanner) {
+		synctex_scanner_free (document->priv->synctex_scanner);
 	}
 
 	G_OBJECT_CLASS (ev_document_parent_class)->finalize (object);
@@ -306,6 +312,15 @@ ev_document_load (EvDocument  *document,
 		}
 
 		priv->info = _ev_document_get_info (document);
+		if (klass->synctex_enabled(document)) {
+			gchar *filename;
+			GError **err = NULL;
+
+			filename = g_filename_from_uri (uri, NULL, err);
+			if (err == NULL && filename != NULL)
+				priv->synctex_scanner =
+					synctex_scanner_new_with_output_file (filename, NULL, 1);
+		}
 	}
 
 	return retval;
@@ -340,27 +355,93 @@ ev_document_get_page (EvDocument *document,
 	return klass->get_page (document, index);
 }
 
+gboolean
+ev_document_has_synctex (EvDocument *document)
+{
+	return (document != NULL) || (document->priv->synctex_scanner != NULL);
+}
+
+/**
+ * ev_document_sync_to_source:
+ * @document:
+ * @page: the target page
+ * @x:
+ * @y:
+ * Compute the SourceLink corresponding to position (@x,@y) (in 72dpi coordinates) at @page of the 
+ * @document.
+ *
+ * Returns: A GList of EvSourceLink that correspond to the given position. @NULL if synctex 
+ * is not enabled for the document.
+ */
 GList *
 ev_document_sync_to_source (EvDocument *document,
-		      	    gint        page,
-		      	    gfloat	h,
-		      	    gfloat	v)
+			    gint        page,
+			    gfloat	x,
+			    gfloat	y)
 {
-	EvDocumentClass *klass = EV_DOCUMENT_GET_CLASS (document);
+	g_return_val_if_fail (EV_IS_DOCUMENT (document), NULL);
 
-	return klass->sync_to_source (document, page, h, v);
+	GList *ret = NULL;
+	gint   n_links;
+	
+	if (!document->priv->synctex_scanner)
+		return NULL;
+
+	if (synctex_edit_query (document->priv->synctex_scanner, page + 1, x, y) > 0) {
+		synctex_node_t node;
+		EvSourceLink *source;
+//		GArray      *source_array = g_array_sized_new (FALSE, FALSE, sizeof (EvSourceLink), PL_LEN);
+
+		while ((node = synctex_next_result (document->priv->synctex_scanner))) {
+			source = g_new (EvSourceLink, 1);
+			source->uri = g_strdup (synctex_scanner_get_name (document->priv->synctex_scanner,
+									 synctex_node_tag (node)));
+			source->line = synctex_node_line (node);
+			source->col  = synctex_node_column (node);
+			ret = g_list_prepend(ret, source);
+		}
+	}
+
+	return g_list_reverse(ret);
 }
 
 GList **
 ev_document_sync_to_view (EvDocument *document,
-			  gchar *file,
+			  const gchar *file,
 			  gint line,
 			  gint col)
 {
-	EvDocumentClass *klass = EV_DOCUMENT_GET_CLASS (document);
+	g_return_val_if_fail (EV_IS_DOCUMENT (document), NULL);
 
-	return klass->sync_to_view (document, file, line, col);
-}
+	EvRectangle	*rec = NULL;
+	GList		**result;
+	gint		n_pages, page;
+	synctex_scanner_t scanner = document->priv->synctex_scanner;
+	if (!scanner)
+		return NULL;
+
+	n_pages = ev_document_get_n_pages (document);
+	result = g_new0 (GList *, n_pages);
+
+	if (synctex_display_query (scanner, file , line, col) > 0) {
+		synctex_node_t node;
+		while ((node = synctex_next_result (scanner))) {
+			rec = g_new (EvRectangle, 1);
+			page = synctex_node_page (node);
+			rec->x1 = synctex_node_box_visible_h (node);
+			rec->y1 = synctex_node_box_visible_v (node) -
+						synctex_node_box_visible_height (node);
+
+			rec->x2 = synctex_node_box_visible_width (node) + rec->x1;
+			rec->y2 = synctex_node_box_visible_depth (node)  +
+						synctex_node_box_visible_height (node) + rec->y1;
+			result[page] = g_list_prepend (result[page], rec);
+		}
+	}
+
+	return result;
+} 
+
 
 static gint
 _ev_document_get_n_pages (EvDocument  *document)

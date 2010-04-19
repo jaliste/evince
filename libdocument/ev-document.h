@@ -111,17 +111,7 @@ struct _EvDocumentClass
         EvDocumentInfo  * (* get_info)        (EvDocument      *document);
         gboolean          (* get_backend_info)(EvDocument      *document,
                                                EvDocumentBackendInfo *info);
-        GList		* (* sync_to_source)  (EvDocument      *document,
-        				       gint 		page,
-        				       gfloat		h,
-        				       gfloat		v);
-    	
-	GList 	       ** (* sync_to_view)    (EvDocument      *document,
-			  		       gchar 	       *file,
-			  		       gint 		line,
-			  		       gint 		col);
-
-        				       
+        gboolean	  (* synctex_enabled) (EvDocument      *document);
 };
 
 GType            ev_document_get_type             (void) G_GNUC_CONST;
@@ -171,13 +161,14 @@ gboolean         ev_document_has_text_page_labels (EvDocument      *document);
 gboolean         ev_document_find_page_by_label   (EvDocument      *document,
 						   const gchar     *page_label,
 						   gint            *page_index);
+gboolean	 ev_document_has_synctex 	  (EvDocument *document);
 GList *		 ev_document_sync_to_source	  (EvDocument	   *document,
 						   gint		    page,
 						   gfloat	    h,
 						   gfloat	    v);
 
 GList **	 ev_document_sync_to_view 	  (EvDocument *document,
-			  			   gchar *file,
+			  			   const gchar *file,
 			  			   gint line,
 			  			   gint col);
 

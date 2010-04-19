@@ -32,7 +32,9 @@ endif
 
 EV_MEDIA_PLAYER_KEYS_SOURCES = ev-media-player-keys.c ev-media-player-keys.h
 if ENABLE_DBUS
-DBUS_SOURCES = $(EV_MEDIA_PLAYER_KEYS_SOURCES)
+DBUS_SOURCES = $(EV_MEDIA_PLAYER_KEYS_SOURCES) \
+	ev-window-dbus.c		\
+	ev-window-dbus.h
 else
 DBUS_SOURCES = $(null)
 endif

@@ -1739,8 +1739,7 @@ ev_view_sync_source (EvView *view, gint x, gint y)
 	list_source = ev_document_sync_to_source (view->document, page, docx, docy);
 	if (list_source) {
 		EvSourceLink *source = (EvSourceLink *) list_source->data;
-		g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0, source->uri, source->line, source->col);
-		
+		g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0, source->uri, source->line, source->col);		
 	}
 }
 
@@ -3309,10 +3308,9 @@ ev_view_button_press_event (GtkWidget      *widget,
 			EvAnnotation *annot;
 			EvFormField *field;
 
-			if (event->type == GDK_2BUTTON_PRESS) {
+			if (view->has_synctex &&  (event->state & GDK_CONTROL_MASK) != 0) {
 				ev_view_sync_source (view, event->x + view->scroll_x, event->y + view->scroll_y);
-			}
-			else if (EV_IS_SELECTION (view->document) && view->selection_info.selections) {
+			} else if (EV_IS_SELECTION (view->document) && view->selection_info.selections) {
 				if (event->type == GDK_3BUTTON_PRESS) {
 					start_selection_for_event (view, event);
 				} else if (location_in_selected_text (view,
@@ -4385,7 +4383,7 @@ ev_view_init (EvView *view)
 	view->jump_to_find_result = TRUE;
 	view->highlight_find_results = FALSE;
 
-	view->must_sync = FALSE;
+	view->has_synctex = FALSE;
 
 	gtk_layout_set_hadjustment (GTK_LAYOUT (view), NULL);
 	gtk_layout_set_vadjustment (GTK_LAYOUT (view), NULL);
@@ -4648,6 +4646,7 @@ ev_view_document_changed_cb (EvDocumentModel *model,
 			view->pending_scroll = SCROLL_TO_KEEP_POSITION;
 			gtk_widget_queue_resize (GTK_WIDGET (view));
 		}
+		view->has_synctex = ev_document_has_synctex (view->document);
 	}
 }
 

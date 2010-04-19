@@ -181,8 +181,8 @@ struct _EvView {
 	EvViewWindowChild *window_child_focus;
 	
 	/* Synctex */
-	gboolean  	must_sync;
 	GList	      **sync_rects;
+	gboolean	has_synctex;
 };
 
 struct _EvViewClass {

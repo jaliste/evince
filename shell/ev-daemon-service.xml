@@ -16,7 +16,7 @@
       <arg type="s" name="uri" direction="in"/>
     </method>
     
-    <method name="GetViewerForUri">
+    <method name="FindDocument">
     	<annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
     	<arg type="s" name="uri" direction="in"/> 
     	<arg type="s" name="bus_name" direction="out"/>

@@ -1,5 +1,6 @@
 <node>
 	<interface name="org.gnome.evince.Window">
+		<annotation name="org.freedesktop.DBus.GLib.CSymbol" value="ev_window_dbus"/>
 		<signal name="sync_source">
 			<arg type="s" name="file" direction="out"/>
 			<arg type="i" name="h"	  direction="out"/>

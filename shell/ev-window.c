@@ -95,22 +95,8 @@
 #include "ev-progress-message-area.h"
 
 #ifdef ENABLE_DBUS
-void ev_window_sync_view (EvWindow *window, gchar *file, gint line, gint col);
-
 #include "ev-media-player-keys.h"
-#include "ev-window-service.h"
-#include "ev-marshal.h"
 #endif /* ENABLE_DBUS */
-
-#ifdef ENABLE_DBUS
-enum {
-	SIGNAL_SYNC_SOURCE,
-	N_SIGNALS,
-};
-
-static guint signals[N_SIGNALS];
-
-#endif
 
 typedef enum {
 	PAGE_MODE_DOCUMENT,
@@ -335,11 +321,6 @@ static void     ev_window_media_player_key_pressed      (EvWindow         *windo
 static guint ev_window_n_copies = 0;
 
 G_DEFINE_TYPE (EvWindow, ev_window, GTK_TYPE_WINDOW)
-
-#ifdef ENABLE_DBUS
-#define WINDOW_DBUS_OBJECT_PATH "/org/gnome/evince/Evince/Window"
-#define WINDOW_DBUS_INTERFACE   "org.gnome.evince.Window"
-#endif
 
 static gdouble
 get_screen_dpi (EvWindow *window)
@@ -4508,14 +4489,6 @@ attachment_bar_menu_popup_cb (EvSidebarAttachments *attachbar,
 }
 
 static void
-view_sync_source_cb (EvView   *view, gchar *file_uri, int x, int y,
-		    EvWindow *ev_window)
-{
-	g_signal_emit (ev_window, signals[SIGNAL_SYNC_SOURCE],0, file_uri, x, y);
-}
-
-
-static void
 ev_window_update_find_status_message (EvWindow *ev_window)
 {
 	gchar *message;
@@ -5002,21 +4975,7 @@ ev_window_class_init (EvWindowClass *ev_window_class)
 {
 	GObjectClass *g_object_class = G_OBJECT_CLASS (ev_window_class);
 	GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (ev_window_class);
-	
-#ifdef ENABLE_DBUS
-	signals[SIGNAL_SYNC_SOURCE] = g_signal_new ("sync-source",
-	  	         G_TYPE_FROM_CLASS (g_object_class),
-		         G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
-		         0,
-		         NULL, NULL,
-		         ev_marshal_VOID__STRING_INT_INT,
-		         G_TYPE_NONE, 3,
-		         G_TYPE_STRING,
-		         G_TYPE_INT,
-		         G_TYPE_INT);
-	dbus_g_object_type_install_info (EV_TYPE_WINDOW,
-					 &dbus_glib_ev_window_object_info);
-#endif
+
 	g_object_class->dispose = ev_window_dispose;
 	g_object_class->finalize = ev_window_finalize;
 
@@ -6312,10 +6271,6 @@ ev_window_init (EvWindow *ev_window)
 	g_signal_connect_object (ev_window->priv->view, "selection-changed",
 				 G_CALLBACK (view_selection_changed_cb),
 				 ev_window, 0);
-	g_signal_connect_object (ev_window->priv->view, "sync-source",
-			         G_CALLBACK (view_sync_source_cb),
-			         ev_window, 0);
-
 	gtk_widget_show (ev_window->priv->view);
 	gtk_widget_show (ev_window->priv->password_view);
 
@@ -6449,22 +6404,6 @@ ev_window_init (EvWindow *ev_window)
 			   NULL, 0,
 			   GDK_ACTION_COPY);
 	gtk_drag_dest_add_uri_targets (GTK_WIDGET (ev_window));
-#ifdef ENABLE_DBUS
-	{
-		static int count = 1;
-		DBusGConnection *connection;
-		gchar path[100];
-		GError *error = NULL;
-		connection = dbus_g_bus_get (DBUS_BUS_STARTER, &error);
-		g_sprintf(path,"%s/%d",WINDOW_DBUS_OBJECT_PATH, count);
-		if (connection) {
-			dbus_g_connection_register_g_object (connection,
-						 path,
-						     G_OBJECT (ev_window));
-			count++;
-		}
-	}
-#endif
 }
 
 /**
@@ -6486,17 +6425,14 @@ ev_window_new (void)
 	return ev_window;
 }
 
-void 
-ev_window_sync_view (EvWindow *window, gchar *file, gint line, gint col)
+EvView *
+ev_window_get_view (EvWindow *window)
 {
-	printf("%s,%d,%d\n",file,line,col);
-	gint n_pages;
-	GList **results;
-	if (!window->priv->document)
-		return;
-	results = ev_document_sync_to_view (window->priv->document, file, line, col);
-	n_pages = ev_document_get_n_pages (window->priv->document);
-	ev_view_set_sync_rects ( EV_VIEW (window->priv->view), results);
-	
-	gtk_window_present (GTK_WINDOW (window));
+	return EV_VIEW (window->priv->view);
+}
+
+EvDocument *
+ev_window_get_document (EvWindow *window)
+{
+	return window->priv->document;
 }

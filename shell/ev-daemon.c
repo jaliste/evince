@@ -65,7 +65,7 @@ static gboolean ev_daemon_register_document   (EvDaemon              *ev_daemon,
 static gboolean ev_daemon_unregister_document (EvDaemon              *ev_daemon,
 					       const gchar           *uri,
 					       DBusGMethodInvocation *context);
-static gboolean ev_daemon_get_viewer_for_uri  (EvDaemon		     *ev_daemon,
+static gboolean ev_daemon_find_document  (EvDaemon		     *ev_daemon,
 					       const gchar           *uri,
 					       DBusGMethodInvocation *context);
 
@@ -326,7 +326,7 @@ ev_daemon_unregister_document (EvDaemon              *ev_daemon,
 }
 
 static gboolean
-ev_daemon_get_viewer_for_uri  (EvDaemon		*ev_daemon,
+ev_daemon_find_document      (EvDaemon			*ev_daemon,
 			      const gchar		*uri,
 			      DBusGMethodInvocation	*method)
 {
