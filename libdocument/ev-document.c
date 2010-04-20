@@ -138,6 +138,12 @@ ev_document_init (EvDocument *document)
 	document->priv->uniform = TRUE;
 }
 
+static gboolean
+ev_document_impl_synctex_enabled (EvDocument *doc)
+{
+	return FALSE;
+}
+
 static void
 ev_document_class_init (EvDocumentClass *klass)
 {
@@ -148,6 +154,7 @@ ev_document_class_init (EvDocumentClass *klass)
 	klass->get_page = ev_document_impl_get_page;
 	klass->get_info = ev_document_impl_get_info;
 	klass->get_backend_info = NULL;
+	klass->synctex_enabled = ev_document_impl_synctex_enabled;
 
 	g_object_class->finalize = ev_document_finalize;
 }
