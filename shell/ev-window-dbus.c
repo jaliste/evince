@@ -161,14 +161,14 @@ ev_window_dbus_new (void)
 void 
 ev_window_dbus_sync_view (EvWindow *window, gchar *file, gint line, gint col)
 {
-	gint n_pages;
+	/* TODO:-  We should ensure that the first result is visible.
+ 	 *      -  We need a way of unsetting the highlight after some event also. */
 	GList **results;
 	EvDocument *document = ev_window_get_document (window);
 	if (!document)
 		return;
 	results = ev_document_sync_to_view (document, file, line, col);
-	n_pages = ev_document_get_n_pages (document);
 	ev_view_set_sync_rects ( ev_window_get_view (window), results);
-	
-	gtk_window_present (GTK_WINDOW (window));
+	if (results)	
+		gtk_window_present (GTK_WINDOW (window));
 }

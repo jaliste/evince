@@ -440,7 +440,7 @@ ev_document_sync_to_view (EvDocument *document,
 			rec->x2 = synctex_node_box_visible_width (node) + rec->x1;
 			rec->y2 = synctex_node_box_visible_depth (node)  +
 						synctex_node_box_visible_height (node) + rec->y1;
-			result[page] = g_list_prepend (result[page], rec);
+			result[page-1] = g_list_prepend (result[page-1], rec);
 		}
 	}
 
