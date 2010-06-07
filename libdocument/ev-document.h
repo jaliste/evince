@@ -73,6 +73,12 @@ struct _EvDocumentBackendInfo
 	const gchar *version;
 };
 
+typedef struct {
+	gchar *uri;
+	int   line;
+	int   col;
+} EvSourceLink;
+
 struct _EvDocument
 {
 	GObject base;
@@ -105,6 +111,7 @@ struct _EvDocumentClass
         EvDocumentInfo  * (* get_info)        (EvDocument      *document);
         gboolean          (* get_backend_info)(EvDocument      *document,
                                                EvDocumentBackendInfo *info);
+        gboolean	  (* synctex_enabled) (EvDocument      *document);
 };
 
 GType            ev_document_get_type             (void) G_GNUC_CONST;
@@ -157,6 +164,16 @@ gboolean         ev_document_has_text_page_labels (EvDocument      *document);
 gboolean         ev_document_find_page_by_label   (EvDocument      *document,
 						   const gchar     *page_label,
 						   gint            *page_index);
+gboolean	 ev_document_has_synctex 	  (EvDocument *document);
+GList *		 ev_document_sync_to_source	  (EvDocument	   *document,
+						   gint		    page,
+						   gfloat	    h,
+						   gfloat	    v);
+
+GList **	 ev_document_sync_to_view 	  (EvDocument *document,
+			  			   const gchar *file,
+			  			   gint line,
+			  			   gint col);
 
 gint             ev_rect_cmp                      (EvRectangle     *a,
 					           EvRectangle     *b);

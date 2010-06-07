@@ -1,4 +1,5 @@
 lib_LTLIBRARIES = libevdocument.la
+INCLUDES =  -I$(top_srcdir)/cut-n-paste/synctex
 
 NOINST_H_FILES =				\
 	ev-debug.h				\
@@ -109,7 +110,9 @@ libevdocument_la_LDFLAGS = \
 	-export-symbols-regex "^ev_*"	\
 	$(AM_LDFLAGS)
 
-libevdocument_la_LIBADD = $(LIBDOCUMENT_LIBS)
+libevdocument_la_LIBADD = $(LIBDOCUMENT_LIBS)		  \
+	$(top_builddir)/cut-n-paste/synctex/libsynctex.la
+
 
 BUILT_SOURCES = 			\
 	ev-document-type-builtins.c	\

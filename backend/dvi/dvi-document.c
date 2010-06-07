@@ -235,6 +235,12 @@ dvi_document_finalize (GObject *object)
 	G_OBJECT_CLASS (dvi_document_parent_class)->finalize (object);
 }
 
+static gboolean
+dvi_document_synctex_enabled (EvDocument *doc)
+{
+	return TRUE;
+}
+
 static void
 dvi_document_class_init (DviDocumentClass *klass)
 {
@@ -258,6 +264,7 @@ dvi_document_class_init (DviDocumentClass *klass)
 	ev_document_class->get_n_pages = dvi_document_get_n_pages;
 	ev_document_class->get_page_size = dvi_document_get_page_size;
 	ev_document_class->render = dvi_document_render;
+	ev_document_class->synctex_enabled = dvi_document_synctex_enabled;
 }
 
 static void
