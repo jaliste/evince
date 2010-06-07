@@ -85,7 +85,9 @@ evince_SOURCES=				\
 if ENABLE_DBUS
 evince_SOURCES += \
 	ev-media-player-keys.c \
-	ev-media-player-keys.h
+	ev-media-player-keys.h \
+	ev-window-dbus.c	   \
+	ev-window-dbus.h
 endif
 
 

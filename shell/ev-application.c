@@ -647,9 +647,13 @@ _ev_application_open_uri_at_dest (EvApplication  *application,
 	EvWindow *ev_window;
 
 	ev_window = ev_application_get_empty_window (application, screen);
-	if (!ev_window)
+	if (!ev_window) {
+#ifdef ENABLE_DBUS
+		ev_window = EV_WINDOW (ev_window_dbus_new ());
+#else
 		ev_window = EV_WINDOW (ev_window_new ());
-
+#endif
+	}
 	ev_application_open_uri_in_window (application, uri, ev_window,
 					   screen, dest, mode,
 					   search_string,
@@ -706,7 +710,11 @@ ev_application_open_window (EvApplication *application,
 			    GdkScreen     *screen,
 			    guint32        timestamp)
 {
+#ifdef ENABLE_DBUS
+	GtkWidget *new_window = ev_window_dbus_new ();
+#else
 	GtkWidget *new_window = ev_window_new ();
+#endif
 #ifdef GDK_WINDOWING_X11
 	GdkWindow *gdk_window;
 #endif

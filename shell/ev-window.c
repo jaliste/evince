@@ -6526,3 +6526,15 @@ ev_window_new (void)
 
 	return ev_window;
 }
+
+EvView *
+ev_window_get_view (EvWindow *window)
+{
+	return EV_VIEW (window->priv->view);
+}
+
+EvDocument *
+ev_window_get_document (EvWindow *window)
+{
+	return window->priv->document;
+}

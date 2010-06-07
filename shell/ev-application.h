@@ -30,8 +30,11 @@
 #include <glib.h>
 #include <gtk/gtk.h>
 
-#include "ev-window.h"
 
+#include "ev-window.h"
+#ifdef ENABLE_DBUS
+#include "ev-window-dbus.h"
+#endif
 G_BEGIN_DECLS
 
 typedef struct _EvApplication EvApplication;

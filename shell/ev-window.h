@@ -27,6 +27,8 @@
 #include <gtk/gtk.h>
 
 #include "ev-link.h"
+#include "ev-view.h"
+#include "ev-document.h"
 
 G_BEGIN_DECLS
 
@@ -84,7 +86,10 @@ void		ev_window_open_document (EvWindow       *ev_window,
 gboolean	ev_window_is_empty	(const EvWindow *ev_window);
 void		ev_window_print_range   (EvWindow       *ev_window,
 					 int             first_page,
-					 int		 last_page);
+					 int		 last_page);					 
+EvView	       *ev_window_get_view	(EvWindow	*ev_window);
+EvDocument     *ev_window_get_document	(EvWindow	*ev_window);
+
 
 G_END_DECLS
 
