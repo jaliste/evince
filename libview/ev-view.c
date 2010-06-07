@@ -54,6 +54,7 @@ enum {
 	SIGNAL_EXTERNAL_LINK,
 	SIGNAL_POPUP_MENU,
 	SIGNAL_SELECTION_CHANGED,
+	SIGNAL_SYNC_SOURCE,
 	N_SIGNALS
 };
 
@@ -192,6 +193,11 @@ static void       ev_view_reload_page                        (EvView            
 							      gint                page,
 							      GdkRegion          *region);
 static void       ev_view_loading_window_move                (EvView             *view);
+
+static void 	  highlight_sync_rects 			     (EvView 		 *view,
+							      GList 		**page_rects,
+							      int 		  page,
+							      guchar 		  alpha);
 
 /*** Callbacks ***/
 static void       ev_view_change_page                        (EvView             *view,
@@ -1747,6 +1753,25 @@ ev_view_handle_link (EvView *view, EvLink *link)
 	}
 }
 
+static void
+ev_view_sync_source (EvView *view, gint x, gint y)
+{
+	int page;
+	gint ox =   0, oy   = 0;
+	gint docx = 0, docy = 0;
+
+	GList *list_source = NULL;
+
+	find_page_at_location (view, x, y, &page, &ox, &oy);
+	if (page == -1)
+		return;
+	get_doc_point_from_offset (view, page, ox, oy, &docx, &docy);
+	list_source = ev_document_sync_to_source (view->document, page, docx, docy);
+	if (list_source)
+		g_signal_emit (view, signals[SIGNAL_SYNC_SOURCE], 0, list_source);
+
+}
+
 static char *
 tip_from_action_named (EvLinkAction *action)
 {
@@ -3140,6 +3165,9 @@ ev_view_expose_event (GtkWidget      *widget,
 
 		if (page_ready && view->find_pages && view->highlight_find_results)
 			highlight_find_results (view, i);
+		if (page_ready && view->sync_rects)
+			highlight_sync_rects (view, view->sync_rects,i, 0x20);
+
 		if (page_ready && EV_IS_DOCUMENT_ANNOTATIONS (view->document))
 			show_annotation_windows (view, i);
 	}
@@ -3338,7 +3366,9 @@ ev_view_button_press_event (GtkWidget      *widget,
 			EvAnnotation *annot;
 			EvFormField *field;
 
-			if (EV_IS_SELECTION (view->document) && view->selection_info.selections) {
+			if (view->has_synctex &&  (event->state & GDK_CONTROL_MASK) != 0) {
+				ev_view_sync_source (view, event->x + view->scroll_x, event->y + view->scroll_y);
+			} else if (EV_IS_SELECTION (view->document) && view->selection_info.selections) {
 				if (event->type == GDK_3BUTTON_PRESS) {
 					start_selection_for_event (view, event);
 				} else if (location_in_selected_text (view,
@@ -3985,6 +4015,23 @@ highlight_find_results (EvView *view, int page)
 }
 
 static void
+highlight_sync_rects (EvView *view, GList **page_rects, int page, guchar alpha)
+{
+	GList *rects;
+	if (!page_rects)
+		return;
+	/*FIXME WE need to ensure that if page_rects is not NULL, then it's a proper pointer array, maybe we should use 
+  		GPtrArray instead since the page_rects can be I don't know what... */
+	rects = page_rects[page];
+	while (rects) {
+		GdkRectangle view_rectangle;
+		doc_rect_to_view_rect (view, page, (EvRectangle *) rects->data, &view_rectangle);
+		draw_rubberband (view, view->layout.bin_window, &view_rectangle, 0x20);
+		rects = g_list_next (rects);
+	}
+}
+
+static void
 ev_view_loading_window_move (EvView *view)
 {
 	GtkWidget       *widget = GTK_WIDGET (view);
@@ -4366,6 +4413,14 @@ ev_view_class_init (EvViewClass *class)
 			 g_cclosure_marshal_VOID__VOID,
                          G_TYPE_NONE, 0,
                          G_TYPE_NONE);
+	signals[SIGNAL_SYNC_SOURCE] = g_signal_new ("sync-source",
+	  	         G_TYPE_FROM_CLASS (object_class),
+		         G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+		         G_STRUCT_OFFSET (EvViewClass, sync_source),
+		         NULL, NULL,
+		         g_cclosure_marshal_VOID__POINTER,
+		         G_TYPE_NONE, 1,
+		         G_TYPE_POINTER);
 
 	binding_set = gtk_binding_set_by_class (class);
 
@@ -4413,6 +4468,8 @@ ev_view_init (EvView *view)
 	view->pending_scroll = SCROLL_TO_KEEP_POSITION;
 	view->jump_to_find_result = TRUE;
 	view->highlight_find_results = FALSE;
+
+	view->has_synctex = FALSE;
 
 	gtk_layout_set_hadjustment (GTK_LAYOUT (view), NULL);
 	gtk_layout_set_vadjustment (GTK_LAYOUT (view), NULL);
@@ -4715,6 +4772,7 @@ ev_view_document_changed_cb (EvDocumentModel *model,
 			view->pending_scroll = SCROLL_TO_KEEP_POSITION;
 			gtk_widget_queue_resize (GTK_WIDGET (view));
 		}
+		view->has_synctex = ev_document_has_synctex (view->document);
 	}
 }
 
@@ -5208,6 +5266,12 @@ jump_to_find_page (EvView *view, EvViewFindDirection direction, gint shift)
 			break;
 		}
 	}
+}
+
+void
+ev_view_set_sync_rects (EvView *view, GList **rects)
+{
+	view->sync_rects = rects;
 }
 
 void
@@ -5866,4 +5930,4 @@ ev_view_previous_page (EvView *view)
 		return FALSE;
 	}
 }
-		
+
