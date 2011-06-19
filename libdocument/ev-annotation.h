@@ -30,6 +30,7 @@
 
 #include "ev-document.h"
 #include "ev-attachment.h"
+#include "ev-media.h"
 
 G_BEGIN_DECLS
 
@@ -65,6 +66,14 @@ G_BEGIN_DECLS
 #define EV_IS_ANNOTATION_ATTACHMENT_CLASS(klass)   (G_TYPE_CHECK_CLASS_TYPE((klass), EV_TYPE_ANNOTATION_ATTACHMENT))
 #define EV_ANNOTATION_ATTACHMENT_GET_CLASS(object) (G_TYPE_INSTANCE_GET_CLASS((object), EV_TYPE_ANNOTATION_ATTACHMENT, EvAnnotationAttachmentClass))
 
+#define EV_TYPE_ANNOTATION_MEDIA		(ev_annotation_media_get_type())
+#define EV_ANNOTATION_MEDIA(object)		(G_TYPE_CHECK_INSTANCE_CAST((object), EV_TYPE_ANNOTATION_MEDIA, EvAnnotationMedia))
+#define EV_ANNOTATION_MEDIA_CLASS(klass)	(G_TYPE_CHECK_CLASS_CAST((klass), EV_TYPE_ANNOTATION_MEDIA, EvAnnotationMediaClass))
+#define EV_IS_ANNOTATION_MEDIA(object)        	(G_TYPE_CHECK_INSTANCE_TYPE((object), EV_TYPE_ANNOTATION_MEDIA))
+#define EV_IS_ANNOTATION_MEDIA_CLASS(klass)   	(G_TYPE_CHECK_CLASS_TYPE((klass), EV_TYPE_ANNOTATION_MEDIA))
+#define EV_ANNOTATION_MEDIA_GET_CLASS(object) 	(G_TYPE_INSTANCE_GET_CLASS((object), EV_TYPE_ANNOTATION_MEDIA, EvAnnotationMediaClass))
+
+
 typedef struct _EvAnnotation                EvAnnotation;
 typedef struct _EvAnnotationClass           EvAnnotationClass;
 
@@ -76,6 +85,9 @@ typedef struct _EvAnnotationTextClass       EvAnnotationTextClass;
 
 typedef struct _EvAnnotationAttachment      EvAnnotationAttachment;
 typedef struct _EvAnnotationAttachmentClass EvAnnotationAttachmentClass;
+
+typedef struct _EvAnnotationMedia	    EvAnnotationMedia;
+typedef struct _EvAnnotationMediaClass	    EvAnnotationMediaClass;
 
 typedef enum {
 	EV_ANNOTATION_TYPE_UNKNOWN,
@@ -95,6 +107,17 @@ typedef enum {
 	EV_ANNOTATION_TEXT_ICON_CIRCLE,
 	EV_ANNOTATION_TEXT_ICON_UNKNOWN
 } EvAnnotationTextIcon;
+
+struct _EvAnnotationMedia
+{
+	EvAnnotation parent;
+	EvMedia *media;
+};
+struct _EvAnnotationMediaClass
+{
+	EvAnnotationClass parent_class;
+};
+
 
 /* EvAnnotation */
 GType                ev_annotation_get_type                  (void) G_GNUC_CONST;
@@ -155,6 +178,11 @@ EvAnnotation        *ev_annotation_attachment_new            (EvPage            
 EvAttachment        *ev_annotation_attachment_get_attachment (EvAnnotationAttachment *annot);
 gboolean             ev_annotation_attachment_set_attachment (EvAnnotationAttachment *annot,
 							      EvAttachment           *attachment);
+
+/* EvAnnotationMedia */
+GType         ev_annotation_media_get_type  	 (void) G_GNUC_CONST;
+EvAnnotation *ev_annotation_media_new       	 (EvPage             *page,
+						  EvMedia            *media);
 
 G_END_DECLS
 

@@ -114,6 +114,8 @@ G_DEFINE_TYPE_WITH_CODE (EvAnnotationAttachment, ev_annotation_attachment, EV_TY
 		 G_IMPLEMENT_INTERFACE (EV_TYPE_ANNOTATION_MARKUP,
 					ev_annotation_attachment_markup_iface_init);
 	 });
+	 
+G_DEFINE_TYPE (EvAnnotationMedia, ev_annotation_media, EV_TYPE_ANNOTATION);
 
 /* EvAnnotation */
 static void
@@ -999,4 +1001,53 @@ ev_annotation_attachment_set_attachment (EvAnnotationAttachment *annot,
 	g_object_notify (G_OBJECT (annot), "attachment");
 
 	return TRUE;
+}
+
+/* EvAnnotationMedia */
+static void
+ev_annotation_media_finalize (GObject *object)
+{
+	EvAnnotationMedia *annot = EV_ANNOTATION_MEDIA (object);
+
+	if (annot->media) {
+		g_object_unref (annot->media);
+		annot->media = NULL;
+	}
+
+	G_OBJECT_CLASS (ev_annotation_media_parent_class)->finalize (object);
+}
+
+static void
+ev_annotation_media_init (EvAnnotationMedia *annot)
+{
+}
+
+static void
+ev_annotation_media_class_init (EvAnnotationMediaClass *klass)
+{
+	GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
+
+	//ev_annotation_markup_class_install_properties (g_object_class);
+
+	g_object_class->finalize = ev_annotation_media_finalize;
+}
+
+static void
+ev_annotation_media_markup_iface_init (EvAnnotationMarkupIface *iface)
+{
+}
+
+EvAnnotation *
+ev_annotation_media_new (EvPage   *page,
+			 EvMedia  *media)
+{
+	EvAnnotation *annot;
+
+	g_return_val_if_fail (EV_IS_MEDIA (media), NULL);
+
+	annot = EV_ANNOTATION (g_object_new (EV_TYPE_ANNOTATION_MEDIA, NULL));
+	annot->page = g_object_ref (page);
+	EV_ANNOTATION_MEDIA (annot)->media = g_object_ref (media);
+
+	return annot;
 }

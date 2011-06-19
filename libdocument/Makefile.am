@@ -39,7 +39,8 @@ INST_H_SRC_FILES = 				\
 	ev-render-context.h			\
 	ev-selection.h				\
 	ev-transition-effect.h			\
-	ev-version.h
+	ev-version.h				\
+	ev-media.h
 
 INST_H_FILES = 					\
 	$(INST_H_SRC_FILES)			\
@@ -85,6 +86,7 @@ libevdocument3_la_SOURCES=			\
 	ev-selection.c				\
 	ev-transition-effect.c			\
 	ev-document-misc.c			\
+	ev-media.c				\
 	$(NOINST_H_FILES)			\
 	$(INST_H_FILES)
 
