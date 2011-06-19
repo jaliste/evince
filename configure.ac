@@ -475,6 +475,26 @@ fi
 AM_CONDITIONAL(ENABLE_PDF, test x$enable_pdf = xyes)
 dnl ================== end of pdf checks ============================================
 
+dnl ================== gst checks ===================================================
+AC_ARG_ENABLE([gstreamer],
+  [AS_HELP_STRING([--disable-gstreamer],
+		[Disable the GStreamer support])],
+  [enable_gstreamer=$enableval],
+  [enable_gstreamer=yes])
+
+if test "x$enable_gstreamer=xyes"; then
+    GSTREAMER_REQUIRED=0.10.12
+    PKG_CHECK_MODULES(GSTREAMER, gstreamer-0.10 >= $GSTREAMER_REQUIRED gstreamer-base-0.10 >= $GSTREAMER_REQUIRED gstreamer-interfaces-0.10 
+				 gstreamer-video-0.10,
+				 enable_gstreamer=yes, enable_gstreamer=no)
+
+    if test "x$enable_gstreamer" = "xyes"; then
+	AC_DEFINE([HAVE_MOVIE],[1], [defined if movie support is available])
+    fi
+fi
+AM_CONDITIONAL(ENABLE_GSTREAMER, test x$enable_gstreamer = xyes)
+dnl ================== end of gst checks ============================================	
+
 dnl libspectre (used by ps and dvi backends)
 SPECTRE_REQUIRED=0.2.0 
 PKG_CHECK_MODULES(SPECTRE, libspectre >= $SPECTRE_REQUIRED,have_spectre=yes,have_spectre=no)
@@ -745,6 +765,7 @@ cut-n-paste/toolbar-editor/Makefile
 cut-n-paste/zoom-control/Makefile
 cut-n-paste/totem-screensaver/Makefile
 cut-n-paste/synctex/Makefile
+cut-n-paste/gstgtk/Makefile
 data/evince.desktop.in
 data/Makefile
 data/icons/Makefile
@@ -820,4 +841,6 @@ Configure summary:
 	DVI Backend........:  $enable_dvi
 	Comics Backend.....:  $enable_comics
 	XPS Backend........:  $enable_xps
+
+	Movie Support......:  $enable_gstreamer
 "
