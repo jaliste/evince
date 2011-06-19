@@ -22,7 +22,10 @@
 #include "config.h"
 
 #include <math.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <string.h>
+
 #include <gtk/gtk.h>
 #include <poppler.h>
 #include <poppler-document.h>
@@ -54,6 +57,7 @@
 #include "ev-transition-effect.h"
 #include "ev-attachment.h"
 #include "ev-image.h"
+#include "ev-media.h"
 
 #include <libxml/tree.h>
 #include <libxml/parser.h>
@@ -112,6 +116,16 @@ struct _PdfDocument
 	GHashTable *annots;
 };
 
+struct _PdfMedia
+{
+	EvMedia parent_instance;
+	PopplerMedia  *backend_media;
+};
+struct _PdfMediaClass
+{
+	EvMediaClass parent_class;
+};
+
 static void pdf_document_security_iface_init             (EvDocumentSecurityInterface    *iface);
 static void pdf_document_document_links_iface_init       (EvDocumentLinksInterface       *iface);
 static void pdf_document_document_images_iface_init      (EvDocumentImagesInterface      *iface);
@@ -137,6 +151,9 @@ static gboolean    attachment_save_to_buffer (PopplerAttachment *attachment,
 					      gchar            **buffer,
 					      gsize             *buffer_size,
 					      GError           **error);
+
+static gchar *	   pdf_media_get_uri (EvMedia *ev_media);
+
 
 EV_BACKEND_REGISTER_WITH_CODE (PdfDocument, pdf_document,
 			 {
@@ -169,6 +186,10 @@ EV_BACKEND_REGISTER_WITH_CODE (PdfDocument, pdf_document,
 				 EV_BACKEND_IMPLEMENT_INTERFACE (EV_TYPE_DOCUMENT_TEXT,
 								 pdf_document_text_iface_init);
 			 });
+
+G_DEFINE_TYPE (PdfMedia, pdf_media, EV_TYPE_MEDIA);
+
+
 
 static void
 pdf_document_dispose (GObject *object)
@@ -901,6 +922,21 @@ pdf_document_class_init (PdfDocumentClass *klass)
 	ev_document_class->get_backend_info = pdf_document_get_backend_info;
 	ev_document_class->support_synctex = pdf_document_support_synctex;
 }
+
+static void
+pdf_media_class_init (PdfMediaClass *klass)
+{
+	EvMediaClass* ev_media_class = EV_MEDIA_CLASS (klass);
+	ev_media_class->get_uri = pdf_media_get_uri;
+}
+
+static void
+pdf_media_init (PdfMedia *self)
+{
+
+}
+
+
 
 /* EvDocumentSecurity */
 static gboolean
@@ -2460,6 +2496,12 @@ pdf_document_document_forms_iface_init (EvDocumentFormsInterface *iface)
 }
 
 /* Annotations */
+static PdfMedia* 
+_pdf_media_new()
+{	PdfMedia *media;
+	media = PDF_MEDIA (g_object_new (PDF_TYPE_MEDIA, NULL));
+	return media;
+}
 static void
 poppler_annot_color_to_gdk_color (PopplerAnnot *poppler_annot,
 				  GdkColor     *color)
@@ -2590,6 +2632,26 @@ ev_annot_from_poppler_annot (PopplerAnnot *poppler_annot,
 
 			if (poppler_attachment)
 				g_object_unref (poppler_attachment);
+		}
+			break;
+		case POPPLER_ANNOT_MOVIE: {
+		}
+			break;
+		case POPPLER_ANNOT_SCREEN: {
+			// We look for the rendition action associated for this annotation.
+			PopplerAnnotScreen 	*poppler_annot_screen;
+			PopplerAction		*action;
+			PdfMedia		*media;
+			
+			poppler_annot_screen = POPPLER_ANNOT_SCREEN (poppler_annot);
+			action = poppler_annot_screen_get_action (poppler_annot_screen);
+			if (action->type == POPPLER_ACTION_RENDITION) {
+				media = _pdf_media_new();
+				media->backend_media = action->rendition.media;
+				ev_annot = ev_annotation_media_new (page, EV_MEDIA(media));
+				//g_object_ref (screen_action->rendition.media);
+				//ev_media_new 
+			}
 		}
 			break;
 	        case POPPLER_ANNOT_LINK:
@@ -3049,6 +3111,75 @@ pdf_document_attachments_get_attachments (EvDocumentAttachments *document)
 	return g_list_reverse (retval);
 }
 
+
+static gboolean
+save_helper (const gchar  *buf,
+	     gsize         count,
+	     gpointer      data,
+	     GError      **error)
+{
+	gint fd = GPOINTER_TO_INT (data);
+
+	return write (fd, buf, count) == count;
+}
+/* Get a GFile associated with the media. If the media is embedded, then it creates a temp_file as needed and 
+ * return the associated GFile. 
+ */
+static gchar *
+pdf_media_get_uri (EvMedia *ev_media)
+{
+	GFile *file = NULL;
+	gchar *uri = NULL;
+	PopplerMedia *media = PDF_MEDIA (ev_media)->backend_media;
+	if (poppler_media_is_embedded (media)) {
+		gint   fd;
+		gchar *tmp_filename = NULL;
+
+		fd = g_file_open_tmp (NULL, &tmp_filename, NULL);
+		if (fd != -1) {
+			if (poppler_media_save_to_callback (media, save_helper, GINT_TO_POINTER (fd), NULL)) {
+				file = g_file_new_for_path (tmp_filename);
+				g_object_set_data_full (G_OBJECT (media),
+							"tmp-file", g_object_ref (file), NULL);
+	/*FIXME						(GDestroyNotify)free_tmp_file);*/
+			} else {
+				g_free (tmp_filename);
+			}
+			close (fd);
+		} else if (tmp_filename) {
+			g_free (tmp_filename);
+		}
+
+	} else {
+		const gchar *filename;
+
+		filename = poppler_media_get_filename (media);
+		if (g_path_is_absolute (filename)) {
+			file = g_file_new_for_path (filename);
+		} else if (g_strrstr (filename, "://")) {
+			file = g_file_new_for_uri (filename);
+		} else {
+			gchar *cwd;
+			gchar *path;
+
+			// FIXME: relative to doc uri, not cwd
+			cwd = g_get_current_dir ();
+			path = g_build_filename (cwd, filename, NULL);
+			g_free (cwd);
+
+			file = g_file_new_for_path (path);
+			g_free (path);
+		}
+	}
+ 	
+	if (file) {
+                uri = g_file_get_uri (file);
+                g_object_unref (file);
+        }
+	
+	return uri;
+}
+
 static gboolean
 pdf_document_attachments_has_attachments (EvDocumentAttachments *document)
 {
@@ -3063,6 +3194,8 @@ pdf_document_document_attachments_iface_init (EvDocumentAttachmentsInterface *if
 	iface->has_attachments = pdf_document_attachments_has_attachments;
 	iface->get_attachments = pdf_document_attachments_get_attachments;
 }
+
+/* Movie */
 
 /* Layers */
 static gboolean

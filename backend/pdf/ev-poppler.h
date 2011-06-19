@@ -20,6 +20,7 @@
 #define __PDF_DOCUMENT_H__
 
 #include "ev-document.h"
+#include "ev-media.h"
 
 G_BEGIN_DECLS
 
@@ -27,10 +28,24 @@ G_BEGIN_DECLS
 #define PDF_DOCUMENT(obj)             (G_TYPE_CHECK_INSTANCE_CAST ((obj), PDF_TYPE_DOCUMENT, PdfDocument))
 #define PDF_IS_DOCUMENT(obj)          (G_TYPE_CHECK_INSTANCE_TYPE ((obj), PDF_TYPE_DOCUMENT))
 
+#define PDF_TYPE_MEDIA                  (pdf_media_get_type ())
+#define PDF_MEDIA(obj)                  (G_TYPE_CHECK_INSTANCE_CAST ((obj), PDF_TYPE_MEDIA, PdfMedia))
+#define PDF_IS_MEDIA(obj)               (G_TYPE_CHECK_INSTANCE_TYPE ((obj), PDF_TYPE_MEDIA))
+
+/*#define PDF_MEDIA_CLASS(klass)          (G_TYPE_CHECK_CLASS_CAST ((klass), PDF_TYPE_MEDIA, MamanBarClass))
+#define PDF_IS_MEDIA_CLASS(klass)       (G_TYPE_CHECK_CLASS_TYPE ((klass), PDF_TYPE_MEDIA))
+#define PDF_MEDIA_GET_CLASS(obj)        (G_TYPE_INSTANCE_GET_CLASS ((obj), PDF_TYPE_MEDIA, MamanBarClass))
+*/
 typedef struct _PdfDocument PdfDocument;
 typedef struct _PdfDocumentClass PdfDocumentClass;
 
+
+typedef struct _PdfMedia PdfMedia;
+typedef struct _PdfMediaClass PdfMediaClass;
+
 GType                 pdf_document_get_type   (void) G_GNUC_CONST;
+GType                 pdf_media_get_type      (void) G_GNUC_CONST;
+
 
 G_MODULE_EXPORT GType register_evince_backend (GTypeModule *module);
 
