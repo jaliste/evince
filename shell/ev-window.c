@@ -4013,7 +4013,6 @@ ev_window_run_presentation (EvWindow *window)
 	gboolean fullscreen_window = TRUE;
 	guint    current_page;
 	guint    rotation;
-	gboolean inverted_colors;
 
 	if (EV_WINDOW_IS_PRESENTATION (window))
 		return;
@@ -4025,11 +4024,8 @@ ev_window_run_presentation (EvWindow *window)
 
 	current_page = ev_document_model_get_page (window->priv->model);
 	rotation = ev_document_model_get_rotation (window->priv->model);
-	inverted_colors = ev_document_model_get_inverted_colors (window->priv->model);
-	window->priv->presentation_view = ev_view_presentation_new (window->priv->document,
-								    current_page,
-								    rotation,
-								    inverted_colors);
+	window->priv->presentation_view =
+		ev_view_presentation_new (window->priv->document, current_page, rotation);
 	g_signal_connect_swapped (window->priv->presentation_view, "finished",
 				  G_CALLBACK (ev_window_view_presentation_finished),
 				  window);

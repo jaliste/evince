@@ -32,13 +32,16 @@
 #include "ev-file-helpers.h"
 #include "ev-stock-icons.h"
 #include "ev-metadata.h"
-
+#ifdef HAVE_MOVIE
+#include <gst/gst.h>
+#endif
 #ifdef WITH_SMCLIENT
 #include "eggsmclient.h"
 #ifdef GDK_WINDOWING_X11
 #include "eggdesktopfile.h"
 #endif
 #endif /* WITH_SMCLIENT */
+
 
 #ifdef G_OS_WIN32
 #include <io.h>
@@ -190,7 +193,6 @@ load_files (const char **files)
 		mode = EV_WINDOW_MODE_PRESENTATION;
 
 	for (i = 0; files[i]; i++) {
-		const gchar *filename;
 		gchar       *uri;
 		gchar       *label;
 		GFile       *file;
@@ -217,7 +219,14 @@ load_files (const char **files)
 			continue;
 		}
 
-
+		label = strchr (uri, '#');
+		if (label) {
+			*label = 0;
+			label++;
+			dest = ev_link_dest_new_page_label (label);
+		} else if (global_dest) {
+			dest = g_object_ref (global_dest);
+		}
 
 		ev_application_open_uri_at_dest (EV_APP, uri, screen, dest,
 						 mode, ev_find_string,
@@ -263,7 +272,9 @@ main (int argc, char *argv[])
 	/* Init glib threads asap */
 	if (!g_thread_supported ())
 		g_thread_init (NULL);
-
+#ifdef HAVE_MOVIE
+	gst_init(NULL,NULL);
+#endif
 #ifdef ENABLE_NLS
 	/* Initialize the i18n stuff */
 	bindtextdomain (GETTEXT_PACKAGE, ev_get_locale_dir());

@@ -20,6 +20,7 @@ INCLUDES=							\
 	-DEVINCE_COMPILATION					\
 	$(SHELL_CFLAGS)						\
 	$(WARN_CFLAGS)						\
+	$(GSTREAMER_CFLAGS)					\
 	$(DISABLE_DEPRECATED)
 
 bin_PROGRAMS=evince
