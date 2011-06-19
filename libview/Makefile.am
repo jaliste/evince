@@ -56,7 +56,9 @@ libevview3_la_CPPFLAGS = \
 	-DEVINCE_COMPILATION			\
 	-I$(top_srcdir)				\
 	-I$(top_srcdir)/libdocument		\
+	-I$(top_srcdir)/cut-n-paste/gstgtk	\
 	-I$(top_builddir)			\
+	$(GSTREAMER_CFLAGS)			\
 	$(AM_CPPFLAGS)
 
 libevview3_la_CFLAGS = \
@@ -73,6 +75,8 @@ libevview3_la_LDFLAGS = \
 
 libevview3_la_LIBADD = \
 	$(top_builddir)/libdocument/libevdocument3.la \
+	$(top_builddir)/cut-n-paste/gstgtk/libgstgtk.la \
+	$(GSTREAMER_LIBS)				\
 	$(LIBVIEW_LIBS)
 
 BUILT_SOURCES = 			\

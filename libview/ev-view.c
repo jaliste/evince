@@ -44,6 +44,7 @@
 #include "ev-view-accessible.h"
 #include "ev-view-private.h"
 #include "ev-view-type-builtins.h"
+#include "gtkvideowidget.h"
 
 #define EV_VIEW_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), EV_TYPE_VIEW, EvViewClass))
 #define EV_IS_VIEW_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), EV_TYPE_VIEW))
@@ -2745,8 +2746,44 @@ show_annotation_windows (EvView *view,
 		EvAnnotation      *annot;
 		EvViewWindowChild *child;
 		GtkWidget         *window;
-
+		EvRectangle       *doc_rect;
+		GdkRectangle       view_rect;
+		EvRectangle	   area;
+		GtkWidget	  *video;
+		static int a =0;
 		annot = ((EvMapping *)(l->data))->data;
+		area  = ((EvMapping *)(l->data))->area;
+			
+	
+		if (EV_IS_ANNOTATION_MEDIA (annot) && a == 0) {
+			EvMedia    *media;
+			GstElement *player;
+			gchar	   *uri;
+
+			media = EV_ANNOTATION_MEDIA (annot)->media;
+			uri = ev_media_get_uri (media);
+			printf("PRocessing annotation media\n, uri=%s\n", uri);
+			video = gtk_video_widget_new ();
+			a++;
+			doc_rect_to_view_rect (view, page, &area, &view_rect);
+			view_rect.x -= view->scroll_x;
+                        view_rect.y -= view->scroll_y;
+			player = gst_element_factory_make ("playbin",NULL);
+			if (player!=NULL)
+			{
+  			gtk_video_widget_set_pipeline (GTK_VIDEO_WIDGET(video), GST_PIPELINE (player));
+			//gst_element_set_state (player, GST_STATE_READY);
+			
+  			g_object_set (player, "uri", uri, NULL);
+  			gst_element_set_state (player, GST_STATE_PLAYING);
+			} else {
+				printf("error\n");
+			}
+
+			gtk_layout_put (GTK_LAYOUT(view), video, view_rect.x, view_rect.y);
+			gtk_widget_set_size_request (video, view_rect.width, view_rect.height);		
+			gtk_widget_show (video);
+		}
 
 		if (!EV_IS_ANNOTATION_MARKUP (annot))
 			continue;

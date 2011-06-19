@@ -35,8 +35,7 @@ enum {
 	PROP_0,
 	PROP_DOCUMENT,
 	PROP_CURRENT_PAGE,
-	PROP_ROTATION,
-	PROP_INVERTED_COLORS
+	PROP_ROTATION
 };
 
 enum {
@@ -63,7 +62,6 @@ struct _EvViewPresentation
 	cairo_surface_t       *current_surface;
 	EvDocument            *document;
 	guint                  rotation;
-	gboolean               inverted_colors;
 	EvPresentationState    state;
 	gdouble                scale;
 	gint                   monitor_width;
@@ -332,9 +330,6 @@ job_finished_cb (EvJob              *job,
 		 EvViewPresentation *pview)
 {
 	EvJobRender *job_render = EV_JOB_RENDER (job);
-
-	if (pview->inverted_colors)
-		ev_document_misc_invert_surface (job_render->surface);
 
 	if (job != pview->curr_job)
 		return;
@@ -1355,9 +1350,6 @@ ev_view_presentation_set_property (GObject      *object,
 	case PROP_ROTATION:
                 ev_view_presentation_set_rotation (pview, g_value_get_uint (value));
 		break;
-	case PROP_INVERTED_COLORS:
-		pview->inverted_colors = g_value_get_boolean (value);
-		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 	}
@@ -1540,8 +1532,7 @@ ev_view_presentation_init (EvViewPresentation *pview)
 GtkWidget *
 ev_view_presentation_new (EvDocument *document,
 			  guint       current_page,
-			  guint       rotation,
-			  gboolean    inverted_colors)
+			  guint       rotation)
 {
 	g_return_val_if_fail (EV_IS_DOCUMENT (document), NULL);
 	g_return_val_if_fail (current_page < ev_document_get_n_pages (document), NULL);
@@ -1550,7 +1541,6 @@ ev_view_presentation_new (EvDocument *document,
 					 "document", document,
 					 "current_page", current_page,
 					 "rotation", rotation,
-					 "inverted_colors", inverted_colors,
 					 NULL));
 }
 
