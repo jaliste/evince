@@ -108,17 +108,6 @@ typedef enum {
 	EV_ANNOTATION_TEXT_ICON_UNKNOWN
 } EvAnnotationTextIcon;
 
-struct _EvAnnotationMedia
-{
-	EvAnnotation parent;
-	EvMedia *media;
-};
-struct _EvAnnotationMediaClass
-{
-	EvAnnotationClass parent_class;
-};
-
-
 /* EvAnnotation */
 GType                ev_annotation_get_type                  (void) G_GNUC_CONST;
 EvAnnotationType     ev_annotation_get_annotation_type       (EvAnnotation           *annot);

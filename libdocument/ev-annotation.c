@@ -67,6 +67,17 @@ struct _EvAnnotationAttachmentClass {
 	EvAnnotationClass parent_class;
 };
 
+struct _EvAnnotationMedia
+{
+	EvAnnotation parent;
+	EvMedia *media;
+};
+struct _EvAnnotationMediaClass
+{
+	EvAnnotationClass parent_class;
+};
+
+
 static void ev_annotation_markup_default_init          (EvAnnotationMarkupInterface *iface);
 static void ev_annotation_text_markup_iface_init       (EvAnnotationMarkupInterface *iface);
 static void ev_annotation_attachment_markup_iface_init (EvAnnotationMarkupInterface *iface);
@@ -1030,11 +1041,6 @@ ev_annotation_media_class_init (EvAnnotationMediaClass *klass)
 	//ev_annotation_markup_class_install_properties (g_object_class);
 
 	g_object_class->finalize = ev_annotation_media_finalize;
-}
-
-static void
-ev_annotation_media_markup_iface_init (EvAnnotationMarkupIface *iface)
-{
 }
 
 EvAnnotation *
