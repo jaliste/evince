@@ -25,6 +25,14 @@
       <default>nothing</default>
       <_summary>The URI of the directory last used to save a picture</_summary>
     </key>
+    <key name="page-cache-size" type="u">
+      <default>152428800</default>
+      <_summary>The maximum amount of memory used to cache pages</_summary>
+    </key>
+    <key name="max-preloaded-pages" type="u">
+      <default>3</default>
+      <_summary>The maximum amount of loaded pages</_summary>
+    </key>
     <child name="default" schema="org.gnome.Evince.Default"/>
   </schema>
 
