@@ -6,6 +6,7 @@
 typedef struct _CacheJobInfo
 {
 	EvJob *job;
+	EvJobPriority priority;
 	gboolean page_ready;
 
 	/* Region of the page that needs to be drawn */
@@ -14,14 +15,14 @@ typedef struct _CacheJobInfo
 	/* Data we get from rendering */
 	cairo_surface_t *surface;
 
-	/* Selection data. 
+	/* Selection data.
 	 * Selection_points are the coordinates encapsulated in selection.
 	 * target_points is the target selection size. */
 	EvRectangle      selection_points;
 	EvRectangle      target_points;
 	EvSelectionStyle selection_style;
 	gboolean         points_set;
-	
+
 	cairo_surface_t *selection;
 	cairo_region_t  *selection_region;
 } CacheJobInfo;
@@ -45,11 +46,8 @@ struct _EvPixbufCache
 	 * case of twin pages.
 	 */
 	int preload_cache_size;
-	guint job_list_len;
 
-	CacheJobInfo *prev_job;
-	CacheJobInfo *job_list;
-	CacheJobInfo *next_job;
+	GHashTable *job_table;
 };
 
 struct _EvPixbufCacheClass
@@ -94,11 +92,25 @@ static gboolean      new_selection_surface_needed(EvPixbufCache      *pixbuf_cac
 
 G_DEFINE_TYPE (EvPixbufCache, ev_pixbuf_cache, G_TYPE_OBJECT)
 
+static void job_table_key_destroy (gpointer data)
+{
+	gint *page = (gint *) data;
+
+	g_free (page);
+}
+
+static void job_table_value_destroy (gpointer data)
+{
+	g_slice_free (CacheJobInfo, data);
+}
+
 static void
 ev_pixbuf_cache_init (EvPixbufCache *pixbuf_cache)
 {
 	pixbuf_cache->start_page = -1;
 	pixbuf_cache->end_page = -1;
+
+	pixbuf_cache->job_table = g_hash_table_new_full (g_int_hash, g_int_equal, job_table_key_destroy, job_table_value_destroy);
 }
 
 static void
@@ -129,21 +141,8 @@ ev_pixbuf_cache_finalize (GObject *object)
 
 	pixbuf_cache = EV_PIXBUF_CACHE (object);
 
-	if (pixbuf_cache->job_list) {
-		g_slice_free1 (sizeof (CacheJobInfo) * pixbuf_cache->job_list_len,
-			       pixbuf_cache->job_list);
-		pixbuf_cache->job_list = NULL;
-	}
-	if (pixbuf_cache->prev_job) {
-		g_slice_free1 (sizeof (CacheJobInfo) * pixbuf_cache->preload_cache_size,
-			       pixbuf_cache->prev_job);
-		pixbuf_cache->prev_job = NULL;
-	}
-	if (pixbuf_cache->next_job) {
-		g_slice_free1 (sizeof (CacheJobInfo) * pixbuf_cache->preload_cache_size,
-			       pixbuf_cache->next_job);
-		pixbuf_cache->next_job = NULL;
-	}
+	ev_pixbuf_cache_clear (pixbuf_cache);
+	g_hash_table_destroy (pixbuf_cache->job_table);
 
 	g_object_unref (pixbuf_cache->model);
 
@@ -183,24 +182,24 @@ dispose_cache_job_info (CacheJobInfo *job_info,
 	}
 
 	job_info->points_set = FALSE;
+	job_info = NULL;
+}
+
+static void
+destroy_job_table_value (gpointer key,
+			 gpointer value,
+			 gpointer user_data)
+{
+	dispose_cache_job_info ((CacheJobInfo *) value, EV_PIXBUF_CACHE (user_data));
 }
 
 static void
 ev_pixbuf_cache_dispose (GObject *object)
 {
 	EvPixbufCache *pixbuf_cache;
-	int i;
 
 	pixbuf_cache = EV_PIXBUF_CACHE (object);
-
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
-		dispose_cache_job_info (pixbuf_cache->prev_job + i, pixbuf_cache);
-		dispose_cache_job_info (pixbuf_cache->next_job + i, pixbuf_cache);
-	}
-
-	for (i = 0; i < PAGE_CACHE_LEN (pixbuf_cache); i++) {
-		dispose_cache_job_info (pixbuf_cache->job_list + i, pixbuf_cache);
-	}
+	g_hash_table_foreach (pixbuf_cache->job_table, destroy_job_table_value, pixbuf_cache);
 
 	G_OBJECT_CLASS (ev_pixbuf_cache_parent_class)->dispose (object);
 }
@@ -214,7 +213,7 @@ ev_pixbuf_cache_new (GtkWidget       *view,
 	EvPixbufCache *pixbuf_cache;
 
 	pixbuf_cache = (EvPixbufCache *) g_object_new (EV_TYPE_PIXBUF_CACHE, NULL);
-	/* This is a backlink, so we don't ref this */ 
+	/* This is a backlink, so we don't ref this */
 	pixbuf_cache->view = view;
 	pixbuf_cache->model = g_object_ref (model);
 	pixbuf_cache->document = ev_document_model_get_document (model);
@@ -240,6 +239,8 @@ copy_job_to_job_info (EvJobRender   *job_render,
 		      CacheJobInfo  *job_info,
 		      EvPixbufCache *pixbuf_cache)
 {
+	g_assert (job_info != NULL);
+
 	if (job_info->surface) {
 		cairo_surface_destroy (job_info->surface);
 	}
@@ -293,18 +294,21 @@ job_finished_cb (EvJob         *job,
 	}
 
 	job_info = find_job_cache (pixbuf_cache, job_render->page);
-
-	copy_job_to_job_info (job_render, job_info, pixbuf_cache);
-	g_signal_emit (pixbuf_cache, signals[JOB_FINISHED], 0, job_info->region);
+	if (job_info)
+	{
+		copy_job_to_job_info (job_render, job_info, pixbuf_cache);
+		g_signal_emit (pixbuf_cache, signals[JOB_FINISHED], 0, job_info->region);
+	}
 }
 
 /* This checks a job to see if the job would generate the right sized pixbuf
  * given a scale.  If it won't, it removes the job and clears it to NULL.
  */
+
 static void
 check_job_size_and_unref (EvPixbufCache *pixbuf_cache,
-			  CacheJobInfo  *job_info,
-			  gfloat         scale)
+                          CacheJobInfo  *job_info,
+                          gfloat         scale)
 {
 	gint width, height;
 
@@ -334,58 +338,40 @@ check_job_size_and_unref (EvPixbufCache *pixbuf_cache,
  * new cache.  It clears the old job if it doesn't have a place.
  */
 static void
-move_one_job (CacheJobInfo  *job_info,
-	      EvPixbufCache *pixbuf_cache,
-	      int            page,
-	      CacheJobInfo  *new_job_list,
-	      CacheJobInfo  *new_prev_job,
-	      CacheJobInfo  *new_next_job,
-	      int            new_preload_cache_size,
-	      int            start_page,
-	      int            end_page,
-	      gint           priority)
+update_job_priority (CacheJobInfo *job_info,
+		     int	   page,
+		     int 	   new_preload_cache_size,
+		     int 	   start_page,
+		     int	   end_page)
 {
-	CacheJobInfo *target_page = NULL;
-	int page_offset;
+	/* Assume you run this only for jobs we are keeping in the cache */
 	gint new_priority;
+	gint page_offset;
 
-	if (page < (start_page - new_preload_cache_size) ||
-	    page > (end_page + new_preload_cache_size)) {
-		dispose_cache_job_info (job_info, pixbuf_cache);
-		return;
-	}
-
-	/* find the target page to copy it over to. */
 	if (page < start_page) {
-		page_offset = (page - (start_page - new_preload_cache_size));
+                page_offset = (page - (start_page - new_preload_cache_size));
 
-		g_assert (page_offset >= 0 &&
-			  page_offset < new_preload_cache_size);
-		target_page = new_prev_job + page_offset;
-		new_priority = EV_JOB_PRIORITY_LOW;
-	} else if (page > end_page) {
-		page_offset = (page - (end_page + 1));
+                g_assert (page_offset >= 0 &&
+                          page_offset < new_preload_cache_size);
+                new_priority = EV_JOB_PRIORITY_LOW;
+        } else if (page > end_page) {
+                page_offset = (page - (end_page + 1));
 
-		g_assert (page_offset >= 0 &&
-			  page_offset < new_preload_cache_size);
-		target_page = new_next_job + page_offset;
-		new_priority = EV_JOB_PRIORITY_LOW;
-	} else {
-		page_offset = page - start_page;
-		g_assert (page_offset >= 0 &&
-			  page_offset <= ((end_page - start_page) + 1));
-		new_priority = EV_JOB_PRIORITY_URGENT;
-		target_page = new_job_list + page_offset;
-	}
+                g_assert (page_offset >= 0 &&
+                          page_offset < new_preload_cache_size);
+                new_priority = EV_JOB_PRIORITY_LOW;
+        } else {
+                page_offset = page - start_page;
+                g_assert (page_offset >= 0 &&
+                          page_offset <= ((end_page - start_page) + 1));
+                new_priority = EV_JOB_PRIORITY_URGENT;
+        }
 
-	*target_page = *job_info;
-	job_info->job = NULL;
-	job_info->region = NULL;
-	job_info->surface = NULL;
-
-	if (new_priority != priority && target_page->job) {
-		ev_job_scheduler_update_job (target_page->job, new_priority);
-	}
+	if (new_priority != job_info->priority && job_info->job) {
+		// SHOULD UPDATE PRIORITY IF job_info->job is NULL???
+		job_info->priority = new_priority;
+                ev_job_scheduler_update_job (job_info->job, new_priority);
+        }
 }
 
 static gsize
@@ -464,12 +450,10 @@ ev_pixbuf_cache_update_range (EvPixbufCache *pixbuf_cache,
 			      guint          rotation,
 			      gdouble        scale)
 {
-	CacheJobInfo *new_job_list;
-	CacheJobInfo *new_prev_job = NULL;
-	CacheJobInfo *new_next_job = NULL;
 	gint          new_preload_cache_size;
-	guint         new_job_list_len;
-	int           i, page;
+	GHashTableIter iter;
+	gpointer key, value;
+	gint real_start, real_end, page;
 
 	new_preload_cache_size = ev_pixbuf_cache_get_preload_size (pixbuf_cache,
 								   start_page,
@@ -481,74 +465,48 @@ ev_pixbuf_cache_update_range (EvPixbufCache *pixbuf_cache,
 	    pixbuf_cache->preload_cache_size == new_preload_cache_size)
 		return;
 
-	new_job_list_len = (end_page - start_page) + 1;
-	new_job_list = g_slice_alloc0 (sizeof (CacheJobInfo) * new_job_list_len);
-	if (new_preload_cache_size > 0) {
-		new_prev_job = g_slice_alloc0 (sizeof (CacheJobInfo) * new_preload_cache_size);
-		new_next_job = g_slice_alloc0 (sizeof (CacheJobInfo) * new_preload_cache_size);
-	}
+	/* We go through each job in the cache and either clear it, and remove it from the
+ 	 * cache or update its priority */
 
-	/* We go through each job in the old cache and either clear it or move
-	 * it to a new location. */
+	g_hash_table_iter_init (&iter, pixbuf_cache->job_table);
+	while (g_hash_table_iter_next (&iter, &key, &value))
+  	{
+		gint page = *((gint *)key);
+		CacheJobInfo *job_info = (CacheJobInfo *) value;
 
-	/* Start with the prev cache. */
-	page = pixbuf_cache->start_page - pixbuf_cache->preload_cache_size;
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
-		if (page < 0) {
-			dispose_cache_job_info (pixbuf_cache->prev_job + i, pixbuf_cache);
-		} else {
-			move_one_job (pixbuf_cache->prev_job + i,
-				      pixbuf_cache, page,
-				      new_job_list, new_prev_job, new_next_job,
-				      new_preload_cache_size,
-				      start_page, end_page, EV_JOB_PRIORITY_LOW);
+		if (page < 0 || page < (start_page - new_preload_cache_size) ||
+          		  			page > (end_page + new_preload_cache_size)) {
+
+			dispose_cache_job_info (job_info, pixbuf_cache);
+			g_hash_table_iter_remove (&iter);
+        	} else {
+			update_job_priority (job_info, page, new_preload_cache_size, start_page, end_page);
 		}
-		page ++;
 	}
 
-	page = pixbuf_cache->start_page;
-	for (i = 0; i < PAGE_CACHE_LEN (pixbuf_cache) && page >= 0; i++) {
-		move_one_job (pixbuf_cache->job_list + i,
-			      pixbuf_cache, page,
-			      new_job_list, new_prev_job, new_next_job,
-			      new_preload_cache_size,
-			      start_page, end_page, EV_JOB_PRIORITY_URGENT);
-		page ++;
-	}
+	/* We go through all pages in the cache range to add Caches for the pages that don't have
+ 	 * a cache. TODO: Possibly change the way we check for pages without cache */
 
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
-		if (page >= ev_document_get_n_pages (pixbuf_cache->document)) {
-			dispose_cache_job_info (pixbuf_cache->next_job + i, pixbuf_cache);
-		} else {
-			move_one_job (pixbuf_cache->next_job + i,
-				      pixbuf_cache, page,
-				      new_job_list, new_prev_job, new_next_job,
-				      new_preload_cache_size,
-				      start_page, end_page, EV_JOB_PRIORITY_LOW);
+	real_start = MAX (0, start_page - new_preload_cache_size);
+	real_end = MIN (end_page + new_preload_cache_size, ev_document_get_n_pages (pixbuf_cache->document));
+
+	for (page = real_start; page <= real_end; ++page)
+	{
+		CacheJobInfo *job_info;
+
+		job_info = find_job_cache (pixbuf_cache, page);
+
+		if (!job_info) {
+                        gint *key = g_new (gint,1);
+
+			job_info  = g_slice_new0 (CacheJobInfo);
+			*key = page;
+
+			g_hash_table_insert (pixbuf_cache->job_table, key, job_info);
 		}
-		page ++;
-	}
-
-	if (pixbuf_cache->job_list) {
-		g_slice_free1 (sizeof (CacheJobInfo) * pixbuf_cache->job_list_len,
-			       pixbuf_cache->job_list);
-	}
-	if (pixbuf_cache->prev_job) {
-		g_slice_free1 (sizeof (CacheJobInfo) * pixbuf_cache->preload_cache_size,
-			       pixbuf_cache->prev_job);
-	}
-	if (pixbuf_cache->next_job) {
-		g_slice_free1 (sizeof (CacheJobInfo) * pixbuf_cache->preload_cache_size,
-			       pixbuf_cache->next_job);
 	}
 
 	pixbuf_cache->preload_cache_size = new_preload_cache_size;
-	pixbuf_cache->job_list_len = new_job_list_len;
-
-	pixbuf_cache->job_list = new_job_list;
-	pixbuf_cache->prev_job = new_prev_job;
-	pixbuf_cache->next_job = new_next_job;
-
 	pixbuf_cache->start_page = start_page;
 	pixbuf_cache->end_page = end_page;
 }
@@ -557,47 +515,24 @@ static CacheJobInfo *
 find_job_cache (EvPixbufCache *pixbuf_cache,
 		int            page)
 {
-	int page_offset;
+	CacheJobInfo *job_info;
 
-	if (page < (pixbuf_cache->start_page - pixbuf_cache->preload_cache_size) ||
-	    page > (pixbuf_cache->end_page + pixbuf_cache->preload_cache_size))
-		return NULL;
+	job_info = (CacheJobInfo *) g_hash_table_lookup (pixbuf_cache->job_table, &page);
 
-	if (page < pixbuf_cache->start_page) {
-		page_offset = (page - (pixbuf_cache->start_page - pixbuf_cache->preload_cache_size));
-
-		g_assert (page_offset >= 0 &&
-			  page_offset < pixbuf_cache->preload_cache_size);
-		return pixbuf_cache->prev_job + page_offset;
-	}
-
-	if (page > pixbuf_cache->end_page) {
-		page_offset = (page - (pixbuf_cache->end_page + 1));
-
-		g_assert (page_offset >= 0 &&
-			  page_offset < pixbuf_cache->preload_cache_size);
-		return pixbuf_cache->next_job + page_offset;
-	}
-
-	page_offset = page - pixbuf_cache->start_page;
-	g_assert (page_offset >= 0 &&
-		  page_offset <= PAGE_CACHE_LEN(pixbuf_cache));
-	return pixbuf_cache->job_list + page_offset;
+	return job_info;
 }
 
 static void
 ev_pixbuf_cache_clear_job_sizes (EvPixbufCache *pixbuf_cache,
 				 gfloat         scale)
 {
-	int i;
+	GHashTableIter iter;
+	gpointer key, value;
 
-	for (i = 0; i < PAGE_CACHE_LEN (pixbuf_cache); i++) {
-		check_job_size_and_unref (pixbuf_cache, pixbuf_cache->job_list + i, scale);
-	}
-
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
-		check_job_size_and_unref (pixbuf_cache, pixbuf_cache->prev_job + i, scale);
-		check_job_size_and_unref (pixbuf_cache, pixbuf_cache->next_job + i, scale);
+	g_hash_table_iter_init (&iter, pixbuf_cache->job_table);
+	while (g_hash_table_iter_next (&iter, &key, &value))
+	{
+		check_job_size_and_unref (pixbuf_cache, (CacheJobInfo *) value, scale);
 	}
 }
 
@@ -634,6 +569,8 @@ add_job (EvPixbufCache  *pixbuf_cache,
 	 gfloat          scale,
 	 EvJobPriority   priority)
 {
+	g_assert (job_info != NULL);
+
 	job_info->page_ready = FALSE;
 
 	if (job_info->region)
@@ -648,7 +585,7 @@ add_job (EvPixbufCache  *pixbuf_cache,
 		GdkColor text, base;
 
 		get_selection_colors (pixbuf_cache->view, &text, &base);
-		ev_job_render_set_selection_info (EV_JOB_RENDER (job_info->job), 
+		ev_job_render_set_selection_info (EV_JOB_RENDER (job_info->job),
 						  &(job_info->target_points),
 						  job_info->selection_style,
 						  &text, &base);
@@ -658,6 +595,7 @@ add_job (EvPixbufCache  *pixbuf_cache,
 			  G_CALLBACK (job_finished_cb),
 			  pixbuf_cache);
 	ev_job_scheduler_push_job (job_info->job, priority);
+	job_info->priority = priority;
 }
 
 static void
@@ -705,37 +643,19 @@ ev_pixbuf_cache_add_jobs_if_needed (EvPixbufCache *pixbuf_cache,
 				    gint           rotation,
 				    gfloat         scale)
 {
-	CacheJobInfo *job_info;
-	int page;
-	int i;
+	GHashTableIter iter;
+	gpointer key, value;
 
-	for (i = 0; i < PAGE_CACHE_LEN (pixbuf_cache); i++) {
-		job_info = (pixbuf_cache->job_list + i);
-		page = pixbuf_cache->start_page + i;
+	g_hash_table_iter_init (&iter, pixbuf_cache->job_table);
+
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		CacheJobInfo *job_info = (CacheJobInfo *)value;
+		gint page = *((gint *) key);
 
 		add_job_if_needed (pixbuf_cache, job_info,
 				   page, rotation, scale,
 				   EV_JOB_PRIORITY_URGENT);
 	}
-
-	for (i = FIRST_VISIBLE_PREV(pixbuf_cache); i < pixbuf_cache->preload_cache_size; i++) {
-		job_info = (pixbuf_cache->prev_job + i);
-		page = pixbuf_cache->start_page - pixbuf_cache->preload_cache_size + i;
-
-		add_job_if_needed (pixbuf_cache, job_info,
-				   page, rotation, scale,
-				   EV_JOB_PRIORITY_LOW);
-	}
-
-	for (i = 0; i < VISIBLE_NEXT_LEN(pixbuf_cache); i++) {
-		job_info = (pixbuf_cache->next_job + i);
-		page = pixbuf_cache->end_page + 1 + i;
-
-		add_job_if_needed (pixbuf_cache, job_info,
-				   page, rotation, scale,
-				   EV_JOB_PRIORITY_LOW);
-	}
-
 }
 
 void
@@ -762,7 +682,7 @@ ev_pixbuf_cache_set_page_range (EvPixbufCache  *pixbuf_cache,
 	ev_pixbuf_cache_clear_job_sizes (pixbuf_cache, scale);
 
 	/* Next, we update the target selection for our pages */
-	ev_pixbuf_cache_set_selection_list (pixbuf_cache, selection_list);
+//	ev_pixbuf_cache_set_selection_list (pixbuf_cache, selection_list);
 
 	/* Finally, we add the new jobs for all the sizes that don't have a
 	 * pixbuf */
@@ -773,29 +693,18 @@ void
 ev_pixbuf_cache_set_inverted_colors (EvPixbufCache *pixbuf_cache,
 				     gboolean       inverted_colors)
 {
-	gint i;
+	GHashTableIter iter;
+	gpointer key, value;
 
 	if (pixbuf_cache->inverted_colors == inverted_colors)
 		return;
 
 	pixbuf_cache->inverted_colors = inverted_colors;
 
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
-		CacheJobInfo *job_info;
+	g_hash_table_iter_init (&iter, pixbuf_cache->job_table);
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		CacheJobInfo *job_info = (CacheJobInfo *)value;
 
-		job_info = pixbuf_cache->prev_job + i;
-		if (job_info && job_info->surface)
-			ev_document_misc_invert_surface (job_info->surface);
-
-		job_info = pixbuf_cache->next_job + i;
-		if (job_info && job_info->surface)
-			ev_document_misc_invert_surface (job_info->surface);
-	}
-
-	for (i = 0; i < PAGE_CACHE_LEN (pixbuf_cache); i++) {
-		CacheJobInfo *job_info;
-
-		job_info = pixbuf_cache->job_list + i;
 		if (job_info && job_info->surface)
 			ev_document_misc_invert_surface (job_info->surface);
 	}
@@ -840,14 +749,14 @@ new_selection_surface_needed (EvPixbufCache *pixbuf_cache,
 
 		selection_width = cairo_image_surface_get_width (job_info->selection);
 		selection_height = cairo_image_surface_get_height (job_info->selection);
-		
+
 		if (width != selection_width || height != selection_height)
 			return TRUE;
 	} else {
 		if (job_info->points_set)
 			return TRUE;
 	}
-	
+
 	return FALSE;
 }
 
@@ -870,18 +779,14 @@ clear_selection_if_needed (EvPixbufCache *pixbuf_cache,
 void
 ev_pixbuf_cache_clear (EvPixbufCache *pixbuf_cache)
 {
-	int i;
+	GHashTableIter iter;
+	gpointer key, value;
 
-	if (!pixbuf_cache->job_list)
-		return;
-
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
-		dispose_cache_job_info (pixbuf_cache->prev_job + i, pixbuf_cache);
-		dispose_cache_job_info (pixbuf_cache->next_job + i, pixbuf_cache);
-	}
-
-	for (i = 0; i < PAGE_CACHE_LEN (pixbuf_cache); i++) {
-		dispose_cache_job_info (pixbuf_cache->job_list + i, pixbuf_cache);
+	g_hash_table_iter_init (&iter, pixbuf_cache->job_table);
+	while (g_hash_table_iter_next (&iter, &key, &value))
+	{
+		dispose_cache_job_info ((CacheJobInfo *)value, pixbuf_cache);
+		g_hash_table_iter_remove (&iter);
 	}
 }
 
@@ -889,32 +794,15 @@ ev_pixbuf_cache_clear (EvPixbufCache *pixbuf_cache)
 void
 ev_pixbuf_cache_style_changed (EvPixbufCache *pixbuf_cache)
 {
-	gint i;
-
-	if (!pixbuf_cache->job_list)
-		return;
-
 	/* FIXME: doesn't update running jobs. */
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
-		CacheJobInfo *job_info;
+	GHashTableIter iter;
+	gpointer key, value;
 
-		job_info = pixbuf_cache->prev_job + i;
-		if (job_info->selection) {
-			cairo_surface_destroy (job_info->selection);
-			job_info->selection = NULL;
-		}
+	g_hash_table_iter_init (&iter, pixbuf_cache->job_table);
 
-		job_info = pixbuf_cache->next_job + i;
-		if (job_info->selection) {
-			cairo_surface_destroy (job_info->selection);
-			job_info->selection = NULL;
-		}
-	}
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		CacheJobInfo *job_info = (CacheJobInfo *)value;
 
-	for (i = 0; i < PAGE_CACHE_LEN (pixbuf_cache); i++) {
-		CacheJobInfo *job_info;
-
-		job_info = pixbuf_cache->job_list + i;
 		if (job_info->selection) {
 			cairo_surface_destroy (job_info->selection);
 			job_info->selection = NULL;
@@ -1005,7 +893,7 @@ static void
 update_job_selection (CacheJobInfo    *job_info,
 		      EvViewSelection *selection)
 {
-	job_info->points_set = TRUE;		
+	job_info->points_set = TRUE;
 	job_info->target_points = selection->rect;
 	job_info->selection_style = selection->style;
 }
@@ -1030,10 +918,9 @@ void
 ev_pixbuf_cache_set_selection_list (EvPixbufCache *pixbuf_cache,
 				    GList         *selection_list)
 {
+
 	EvViewSelection *selection;
 	GList *list = selection_list;
-	int page;
-	int i;
 
 	g_return_if_fail (EV_IS_PIXBUF_CACHE (pixbuf_cache));
 
@@ -1044,10 +931,16 @@ ev_pixbuf_cache_set_selection_list (EvPixbufCache *pixbuf_cache,
                 return;
 
 	/* We check each area to see what needs updating, and what needs freeing; */
-	page = pixbuf_cache->start_page - pixbuf_cache->preload_cache_size;
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
+
+	GHashTableIter iter;
+	gpointer key, value;
+
+	g_hash_table_iter_init (&iter, pixbuf_cache->job_table);
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		gint page = *((gint *)key);
+		CacheJobInfo *job_info = (CacheJobInfo *) value;
+
 		if (page < 0) {
-			page ++;
 			continue;
 		}
 
@@ -1056,59 +949,17 @@ ev_pixbuf_cache_set_selection_list (EvPixbufCache *pixbuf_cache,
 			if (((EvViewSelection *)list->data)->page == page) {
 				selection = list->data;
 				break;
-			} else if (((EvViewSelection *)list->data)->page > page) 
+			} else if (((EvViewSelection *)list->data)->page > page)
 				break;
 			list = list->next;
 		}
 
 		if (selection)
-			update_job_selection (pixbuf_cache->prev_job + i, selection);
+			update_job_selection (job_info, selection);
 		else
-			clear_job_selection (pixbuf_cache->prev_job + i);
-		page ++;
-	}
-
-	page = pixbuf_cache->start_page;
-	for (i = 0; i < PAGE_CACHE_LEN (pixbuf_cache); i++) {
-		selection = NULL;
-		while (list) {
-			if (((EvViewSelection *)list->data)->page == page) {
-				selection = list->data;
-				break;
-			} else if (((EvViewSelection *)list->data)->page > page) 
-				break;
-			list = list->next;
-		}
-
-		if (selection)
-			update_job_selection (pixbuf_cache->job_list + i, selection);
-		else
-			clear_job_selection (pixbuf_cache->job_list + i);
-		page ++;
-	}
-
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
-		if (page >= ev_document_get_n_pages (pixbuf_cache->document))
-			break;
-
-		selection = NULL;
-		while (list) {
-			if (((EvViewSelection *)list->data)->page == page) {
-				selection = list->data;
-				break;
-			} else if (((EvViewSelection *)list->data)->page > page) 
-				break;
-			list = list->next;
-		}
-
-		if (selection)
-			update_job_selection (pixbuf_cache->next_job + i, selection);
-		else
-			clear_job_selection (pixbuf_cache->next_job + i);
-		page ++;
+			clear_job_selection (job_info);
 	}
 }
-
 
 /* Returns what the pixbuf cache thinks is */
 
@@ -1117,8 +968,6 @@ ev_pixbuf_cache_get_selection_list (EvPixbufCache *pixbuf_cache)
 {
 	EvViewSelection *selection;
 	GList *retval = NULL;
-	int page;
-	int i;
 
 	g_return_val_if_fail (EV_IS_PIXBUF_CACHE (pixbuf_cache), NULL);
 
@@ -1126,53 +975,26 @@ ev_pixbuf_cache_get_selection_list (EvPixbufCache *pixbuf_cache)
                 return NULL;
 
 	/* We check each area to see what needs updating, and what needs freeing; */
-	page = pixbuf_cache->start_page - pixbuf_cache->preload_cache_size;
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
+        GHashTableIter iter;
+        gpointer key, value;
+
+        g_hash_table_iter_init (&iter, pixbuf_cache->job_table);
+        while (g_hash_table_iter_next (&iter, &key, &value)) {
+                gint page = *((gint *)key);
+                CacheJobInfo *job_info = (CacheJobInfo *) value;
+
 		if (page < 0) {
-			page ++;
 			continue;
 		}
 
-		if (pixbuf_cache->prev_job[i].selection_points.x1 != -1) {
+		if (job_info->selection_points.x1 != -1) {
 			selection = g_new0 (EvViewSelection, 1);
 			selection->page = page;
-			selection->rect = pixbuf_cache->prev_job[i].selection_points;
-			if (pixbuf_cache->prev_job[i].selection_region)
-				selection->covered_region = cairo_region_reference (pixbuf_cache->prev_job[i].selection_region);
+			selection->rect = job_info->selection_points;
+			if (job_info->selection_region)
+				selection->covered_region = cairo_region_reference (job_info->selection_region);
 			retval = g_list_append (retval, selection);
 		}
-		
-		page ++;
-	}
-
-	page = pixbuf_cache->start_page;
-	for (i = 0; i < PAGE_CACHE_LEN (pixbuf_cache); i++) {
-		if (pixbuf_cache->job_list[i].selection_points.x1 != -1) {
-			selection = g_new0 (EvViewSelection, 1);
-			selection->page = page;
-			selection->rect = pixbuf_cache->job_list[i].selection_points;
-			if (pixbuf_cache->job_list[i].selection_region)
-				selection->covered_region = cairo_region_reference (pixbuf_cache->job_list[i].selection_region);
-			retval = g_list_append (retval, selection);
-		}
-		
-		page ++;
-	}
-
-	for (i = 0; i < pixbuf_cache->preload_cache_size; i++) {
-		if (page >= ev_document_get_n_pages (pixbuf_cache->document))
-			break;
-
-		if (pixbuf_cache->next_job[i].selection_points.x1 != -1) {
-			selection = g_new0 (EvViewSelection, 1);
-			selection->page = page;
-			selection->rect = pixbuf_cache->next_job[i].selection_points;
-			if (pixbuf_cache->next_job[i].selection_region)
-				selection->covered_region = cairo_region_reference (pixbuf_cache->next_job[i].selection_region);
-			retval = g_list_append (retval, selection);
-		}
-		
-		page ++;
 	}
 
 	return retval;
