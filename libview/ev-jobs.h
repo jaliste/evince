@@ -245,6 +245,8 @@ struct _EvJobRender
 	gint target_width;
 	gint target_height;
 	cairo_surface_t *surface;
+	gint tile;
+	gint tile_level;
 
 	gboolean include_selection;
 	cairo_surface_t *selection;
@@ -480,6 +482,14 @@ EvJob          *ev_job_render_new         (EvDocument      *document,
 					   gdouble          scale,
 					   gint             width,
 					   gint             height);
+EvJob          *ev_job_render_new_tile    (EvDocument      *document,
+                                           gint             page,
+                                           gint             rotation,
+                                           gdouble          scale,
+                                           gint             width,
+                                           gint             height,
+                                           gint             tile,
+                                           gint             tile_level);
 void     ev_job_render_set_selection_info (EvJobRender     *job,
 					   EvRectangle     *selection_points,
 					   EvSelectionStyle selection_style,

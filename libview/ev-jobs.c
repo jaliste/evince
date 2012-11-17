@@ -629,6 +629,7 @@ ev_job_render_run (EvJob *job)
 
 	ev_page = ev_document_get_page (job->document, job_render->page);
 	rc = ev_render_context_new (ev_page, job_render->rotation, job_render->scale);
+	ev_render_context_set_tile (rc, job_render->tile,job_render->tile_level);
 	g_object_unref (ev_page);
 
 	job_render->surface = ev_document_render (job->document, rc);
@@ -698,8 +699,28 @@ ev_job_render_new (EvDocument   *document,
 	job->scale = scale;
 	job->target_width = width;
 	job->target_height = height;
+	job->tile = 0;
+	job->tile_level = 1;
 
 	return EV_JOB (job);
+}
+
+EvJob *
+ev_job_render_new_tile (EvDocument *document,
+			gint	    page,
+			gint	    rotation,
+			gdouble	    scale,
+			gint	    width,
+			gint	    height,
+			gint	    tile,
+			gint	    tile_level)
+{
+	EvJob *job = ev_job_render_new (document, page, rotation, scale, width, height);
+
+	EV_JOB_RENDER (job)->tile = tile;
+	EV_JOB_RENDER (job)->tile_level = tile_level;
+
+	return job;
 }
 
 void
