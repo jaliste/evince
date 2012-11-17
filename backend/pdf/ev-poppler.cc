@@ -389,6 +389,7 @@ pdf_page_render (PopplerPage     *page,
 {
 	cairo_surface_t *surface;
 	cairo_t *cr;
+	int tile_x, tile_y;
 
 	surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
 					      width, height);
@@ -407,8 +408,17 @@ pdf_page_render (PopplerPage     *page,
 	        default:
 			cairo_translate (cr, 0, 0);
 	}
+
+	/* This can be optimized used bitwise operations,
+         * since tile_level is always a power of two.
+         */
+	tile_y = rc->tile / rc->tile_level;
+	tile_x = rc->tile % rc->tile_level;
+
+	cairo_translate (cr, - tile_x * width, - tile_y * height);
 	cairo_scale (cr, rc->scale, rc->scale);
 	cairo_rotate (cr, rc->rotation * G_PI / 180.0);
+
 	poppler_page_render (page, cr);
 
 	cairo_set_operator (cr, CAIRO_OPERATOR_DEST_OVER);
@@ -440,7 +450,10 @@ pdf_document_render (EvDocument      *document,
 		width = (int) ((width_points * rc->scale) + 0.5);
 		height = (int) ((height_points * rc->scale) + 0.5);
 	}
-	
+
+	width = width / rc->tile_level;
+	height = height / rc->tile_level;
+
 	return pdf_page_render (poppler_page,
 				width, height, rc);
 }
