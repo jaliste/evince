@@ -50,6 +50,8 @@ struct _EvRenderContext
 	EvPage *page;
 	gint    rotation;
 	gdouble scale;
+	gint tile;
+	gint tile_level;
 };
 
 
@@ -63,7 +65,9 @@ void             ev_render_context_set_rotation    (EvRenderContext *rc,
 						    gint             rotation);
 void             ev_render_context_set_scale       (EvRenderContext *rc,
 						    gdouble          scale);
-
+void		ev_render_context_set_tile         (EvRenderContext *rc,
+						    gint             tile,
+						    gint             tile_level);
 
 G_END_DECLS
 

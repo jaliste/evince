@@ -65,6 +65,8 @@ ev_render_context_new (EvPage *page,
 	rc->page = page ? g_object_ref (page) : NULL;
 	rc->rotation = rotation;
 	rc->scale = scale;
+	rc->tile = 0;
+	rc->tile_level = 1;
 
 	return rc;
 }
@@ -97,5 +99,14 @@ ev_render_context_set_scale (EvRenderContext *rc,
 	g_return_if_fail (rc != NULL);
 
 	rc->scale = scale;
+}
+
+void
+ev_render_context_set_tile (EvRenderContext *rc,
+			    gint             tile,
+			    gint	     tile_level)
+{
+	rc->tile = tile;
+	rc->tile_level = tile_level;
 }
 
