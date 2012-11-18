@@ -677,9 +677,132 @@ ev_view_set_adjustment_values (EvView         *view,
 	gtk_adjustment_changed (adjustment);
 }
 
+/**
+ * page_tiles_intersect_area:
+ *
+ * Computes the tiles of a page that intersect @area
+ */
+static gboolean
+get_tiles_for_page_area (EvView *view, gint page, GdkRectangle *area, EvPageTiles *tp)
+{
+	GdkRectangle page_area, overlap;
+	GtkBorder border;
+	int tile_width, tile_height;
+
+	ev_view_get_page_extents (view, page, &page_area, &border);
+        tile_width = page_area.width / view->tile_level;
+        tile_height = page_area.height / view->tile_level;
+
+	if (gdk_rectangle_intersect (area, &page_area, &overlap)) {
+		int x, y;
+
+		x = overlap.x - page_area.x;
+		y = overlap.y - page_area.y;
+
+		tp->n_0 = x / tile_width;
+		tp->n_1 = MIN((x + overlap.width) / tile_width, view->tile_level - 1);
+		tp->m_0 = y / tile_height;
+		tp->m_1 = MIN((y + overlap.height) /tile_height, view->tile_level - 1);
+		tp->tile_width = tile_width;
+		tp->tile_height = tile_height;
+	
+		return TRUE;
+	}
+	return FALSE;
+}
+
+static void
+get_visible_tiles_at_page (EvView *view, gint page, EvPageTiles *page_tiles)
+{
+	EvVisibleTiles *visible_tiles = &(view->visible_tiles);
+
+        if (visible_tiles->dual_page) {
+                int dx = (page % 2 == visible_tiles->dual_even_left) ? visible_tiles->tile_level : 0;
+
+                page_tiles->n_0 = visible_tiles->n_0 - dx;
+                page_tiles->n_1 = visible_tiles->n_1 - dx;
+
+                page_tiles->m_0 = MAX (0, visible_tiles->m_0 -  (page + visible_tiles->dual_even_left) / 2  * (visible_tiles->tile_level));
+                page_tiles->m_1 = MIN (visible_tiles->tile_level - 1, visible_tiles->m_1 - (page + visible_tiles->dual_even_left) / 2 * visible_tiles->tile_level);
+        } else {
+                page_tiles->n_0 = visible_tiles->n_0;
+                page_tiles->n_1 = visible_tiles->n_1;
+
+                /* the page is not necessarily visible, so m_0 should be inside good bounds */
+                page_tiles->m_0 = MAX (0, visible_tiles->m_0 -  page * visible_tiles->tile_level);
+                page_tiles->m_1 = MIN (visible_tiles->tile_level - 1, visible_tiles->m_1 - page * visible_tiles->tile_level);
+        }
+}
+
+
+static void
+ev_view_update_visible_grid (EvView *view)
+{
+	EvPageTiles first, last, other;
+	GdkRectangle current_area;
+	gint start_hor_tile, end_hor_tile;
+	gint start_ver_tile, end_ver_tile;
+	int n_visible_pages = view->end_page - view->start_page + 1;
+
+        current_area.x = gtk_adjustment_get_value (view->hadjustment);
+        current_area.width = gtk_adjustment_get_page_size (view->hadjustment);
+        current_area.y = gtk_adjustment_get_value (view->vadjustment);
+        current_area.height = gtk_adjustment_get_page_size (view->vadjustment);
+
+	get_tiles_for_page_area (view, view->start_page, &current_area, &first);
+	if (n_visible_pages > 1) {
+		get_tiles_for_page_area (view, view->end_page, &current_area, &last);
+	} else {
+		last = first;
+	}
+	
+	view->visible_tiles.dual_page = is_dual_page (view, NULL);
+	view->visible_tiles.dual_even_left = view->dual_even_left;
+	view->visible_tiles.tile_level = view->tile_level; 
+	if (is_dual_page (view, NULL)) {
+		if (view->start_page % 2 == view->dual_even_left) {
+			/* start_page is on the left */
+			start_hor_tile = first.n_0;
+		} else {
+		       	/* start_page is on the right */
+			if (get_tiles_for_page_area (view, view->start_page + 1, &current_area, &other))
+				start_hor_tile = other.n_0;
+			else
+				start_hor_tile = first.n_0 + view->tile_level;
+		}
+		start_ver_tile = first.m_0 + (view->start_page + view->dual_even_left) / 2 * view->tile_level;
+
+		if (view->end_page % 2 == view->dual_even_left) {
+			/* end_page is on the left */
+ 		        if (get_tiles_for_page_area (view, view->end_page - 1, &current_area, &other))
+				end_hor_tile = view->tile_level + other.n_1;
+			 else 
+				end_hor_tile = last.n_1;
+		} else {
+			/* end_page is on the right */
+			end_hor_tile = view->tile_level + last.n_1;
+		}
+		end_ver_tile = last.m_1 + (view->end_page + view->dual_even_left) / 2 * view->tile_level;
+	} else {
+		start_hor_tile = first.n_0;
+		end_hor_tile = first.n_1;
+		start_ver_tile = first.m_0 + view->start_page * view->tile_level;
+		end_ver_tile = last.m_1 + view->end_page * view->tile_level;
+	}
+
+	view->visible_tiles.n_0 = start_hor_tile;
+	view->visible_tiles.n_1 = end_hor_tile;
+	view->visible_tiles.m_0 = start_ver_tile;
+	view->visible_tiles.m_1 = end_ver_tile; 
+
+	printf ("Visible tiles (%d,%d)--(%d, %d)\n", start_hor_tile, start_ver_tile, end_hor_tile, end_ver_tile);
+}
+
 static void
 view_update_range_and_current_page (EvView *view)
 {
+	//GdkRectangle page_overlap_1, page_overlap_2;
+	//GdkRectangle page_overlap_n_minus_1, page_overlap_n;
 	gint start = view->start_page;
 	gint end = view->end_page;
 	gboolean odd_left;
@@ -778,6 +901,7 @@ view_update_range_and_current_page (EvView *view)
 			hide_annotation_windows (view, i);
 		}
 	}
+	ev_view_update_visible_grid (view);
 
 	ev_page_cache_set_page_range (view->page_cache,
 				      view->start_page,
@@ -785,10 +909,12 @@ view_update_range_and_current_page (EvView *view)
 	ev_pixbuf_cache_set_page_range (view->pixbuf_cache,
 					view->start_page,
 					view->end_page,
-					view->selection_info.selections);
+					view->selection_info.selections,
+					&(view->visible_tiles),
+					view->tile_level);
 
-	if (ev_pixbuf_cache_get_surface (view->pixbuf_cache, view->current_page))
-	    gtk_widget_queue_draw (GTK_WIDGET (view));
+//	if (ev_pixbuf_cache_get_surface (view->pixbuf_cache, view->current_page))
+//	    gtk_widget_queue_draw (GTK_WIDGET (view));
 }
 
 static void
@@ -4492,31 +4618,47 @@ draw_one_page (EvView       *view,
 	gtk_style_context_restore (context);
 
 	if (gdk_rectangle_intersect (&real_page_area, expose_area, &overlap)) {
-		gint             width, height;
-		cairo_surface_t *page_surface = NULL;
 		cairo_surface_t *selection_surface = NULL;
 		gint offset_x, offset_y;
+		gint             width, height;
+		gint		 tile_width, tile_height;
+		gint 		 tile_x, tile_y;
+		cairo_surface_t *tile_surface = NULL;
+		int i, j;
+		EvPageTiles tp;
 
-		page_surface = ev_pixbuf_cache_get_surface (view->pixbuf_cache, page);
+		get_visible_tiles_at_page (view, page, &tp);
+		ev_view_get_page_size (view, page, &width, &height);
 
-		if (!page_surface) {
-			if (page == current_page)
-				ev_view_set_loading (view, TRUE);
+	        offset_x = overlap.x - real_page_area.x;
+                offset_y = overlap.y - real_page_area.y;
 
-			*page_ready = FALSE;
+		for (i = tp.n_0; i <= tp.n_1; ++i) {
+			for (j = tp.m_0; j <= tp.m_1; ++j) {
+				tile_surface = ev_pixbuf_cache_get_surface (view->pixbuf_cache, page, j * view->tile_level + i, view->tile_level);
 
-			return;
+				if (!tile_surface) {
+					if (page == current_page)
+						ev_view_set_loading (view, TRUE);
+
+					*page_ready = FALSE;
+
+					continue;
+				}
+			
+				if (page == current_page)
+					ev_view_set_loading (view, FALSE);
+
+				tile_width = width / view->tile_level;
+				tile_height = height / view->tile_level;
+				tile_x = tile_width * i;
+				tile_y = tile_height * j;
+
+				draw_surface (cr, tile_surface, overlap.x + tile_x, overlap.y + tile_y, 
+			      		      offset_x, offset_y, tile_width, tile_height);
+			}
 		}
 
-		if (page == current_page)
-			ev_view_set_loading (view, FALSE);
-
-		ev_view_get_page_size (view, page, &width, &height);
-		offset_x = overlap.x - real_page_area.x;
-		offset_y = overlap.y - real_page_area.y;
-
-		draw_surface (cr, page_surface, overlap.x, overlap.y, offset_x, offset_y, width, height);
-		
 		/* Get the selection pixbuf iff we have something to draw */
 		if (find_selection_for_page (view, page) &&
 		    view->selection_mode == EV_VIEW_SELECTION_TEXT) {
@@ -4533,7 +4675,7 @@ draw_one_page (EvView       *view,
 		draw_surface (cr, selection_surface, overlap.x, overlap.y, offset_x, offset_y, width, height);
 
 	}
-}
+}		
 
 /*** GObject functions ***/
 
@@ -4975,6 +5117,7 @@ ev_view_init (EvView *view)
 	view->end_page = -1;
 	view->spacing = 5;
 	view->scale = 1.0;
+	view->tile_level = 16;
 	view->current_page = 0;
 	view->pressed_button = -1;
 	view->cursor = EV_VIEW_CURSOR_NORMAL;

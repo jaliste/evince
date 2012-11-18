@@ -158,6 +158,8 @@ struct _EvView {
 	gint rotation;
 	gdouble scale;
 	gint spacing;
+	gint tile_level;
+	EvVisibleTiles visible_tiles;
 
 	gboolean loading;
 	gboolean can_zoom_in;
