@@ -5117,7 +5117,9 @@ ev_view_init (EvView *view)
 	view->end_page = -1;
 	view->spacing = 5;
 	view->scale = 1.0;
-	view->tile_level = 16;
+	view->tile_level = 1;
+	view->max_tile_width = 0;
+	view->max_tile_height = 0;
 	view->current_page = 0;
 	view->pressed_button = -1;
 	view->cursor = EV_VIEW_CURSOR_NORMAL;
@@ -5409,6 +5411,41 @@ ev_view_autoscroll_stop (EvView *view)
 }
 
 static void
+compute_tile_level (EvView *view)
+{
+	if (view->max_tile_width == 0 || view->max_tile_height == 0) {
+		view->tile_level = 1;
+		return;
+	}
+
+	gdouble doc_width, doc_height;
+	int width_scaled, height_scaled;
+	int width, height;
+	int rotation = view->rotation;
+	gdouble scale = view->scale;
+
+	ev_document_get_max_page_size (view->document, &doc_width, &doc_height);
+	width = (gint)(doc_width * scale + 0.5);
+        height = (gint)(doc_height * scale + 0.5);
+        width_scaled = (rotation == 0 || rotation == 180) ? width : height;
+        height_scaled = (rotation == 0 || rotation == 180) ? height : width;
+	
+	view->tile_level = MAX ((int) (width_scaled / view->max_tile_width) + 1, (int) (height_scaled / view->max_tile_height) +1 );
+	printf ("tile level %d\n", view->tile_level);
+}
+
+void
+ev_view_set_max_tile_size (EvView *view,
+			   gint   max_width,
+			   gint   max_height)
+{
+	printf ("setting max tile size %d %d \n", max_width, max_height);
+	view->max_tile_width = max_width;
+	view->max_tile_height = max_height;
+	compute_tile_level (view);
+}
+
+static void
 ev_view_document_changed_cb (EvDocumentModel *model,
 			     GParamSpec      *pspec,
 			     EvView          *view)
@@ -5549,7 +5586,7 @@ ev_view_scale_changed_cb (EvDocumentModel *model,
 		return;
 
 	view->scale = scale;
-
+	compute_tile_level (view);
 	view->pending_resize = TRUE;
 	if (view->sizing_mode == EV_SIZING_FREE)
 		gtk_widget_queue_resize (GTK_WIDGET (view));

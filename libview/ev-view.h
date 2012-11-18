@@ -71,6 +71,11 @@ void		ev_view_zoom_in		  (EvView         *view);
 gboolean        ev_view_can_zoom_out      (EvView         *view);
 void		ev_view_zoom_out	  (EvView         *view);
 
+void
+ev_view_set_max_tile_size (EvView *view,
+                           gint   max_width,
+                           gint   max_height);
+
 /* Find */
 void            ev_view_find_started              (EvView         *view,
 						   EvJobFind      *job);
