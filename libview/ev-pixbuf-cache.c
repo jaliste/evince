@@ -3,6 +3,12 @@
 #include "ev-job-scheduler.h"
 #include "ev-view-private.h"
 
+typedef struct _JobInfoKey {
+        gint page;
+        gint tile;
+        gint tile_level;
+} JobInfoKey;
+
 typedef struct _CacheJobInfo
 {
 	EvJob *job;
@@ -47,6 +53,19 @@ struct _EvPixbufCache
 	 */
 	int preload_cache_size;
 
+	/* tile_level is a power of two. A page
+         * is divided into (tile_level)^2 tiles
+         *
+         * To count tiles in the pixbuf_cache, we use independent counters
+         * for horizontal and vertical tiles, and these are multiplied
+         * by the page number. For instance, the tile in the position 2,3 of 
+         * the page 2 will be at position "tile_level*2 + 2"
+         */
+ 
+	guint tile_level;
+	EvVisibleTiles visible_tiles;
+	
+
 	GHashTable *job_table;
 };
 
@@ -73,7 +92,7 @@ static void          ev_pixbuf_cache_dispose    (GObject            *object);
 static void          job_finished_cb            (EvJob              *job,
 						 EvPixbufCache      *pixbuf_cache);
 static CacheJobInfo *find_job_cache             (EvPixbufCache      *pixbuf_cache,
-						 int                 page);
+						 JobInfoKey         *key);
 static gboolean      new_selection_surface_needed(EvPixbufCache      *pixbuf_cache,
 						  CacheJobInfo       *job_info,
 						  gint                page,
@@ -92,11 +111,33 @@ static gboolean      new_selection_surface_needed(EvPixbufCache      *pixbuf_cac
 
 G_DEFINE_TYPE (EvPixbufCache, ev_pixbuf_cache, G_TYPE_OBJECT)
 
+static guint
+job_info_key_hash (gconstpointer a)
+{
+	JobInfoKey *key_a = (JobInfoKey *) a;	
+	guint retval =  (guint) key_a->page*key_a->tile_level+key_a->tile;
+
+	return retval;
+}
+
+static gboolean
+job_info_key_equal (gconstpointer a,
+                    gconstpointer b)
+{
+	JobInfoKey *key_a = (JobInfoKey *)a;
+	JobInfoKey *key_b = (JobInfoKey *)b;
+
+	if (key_a->page == key_b->page && key_a->tile == key_b->tile && key_a-> tile_level == key_b->tile_level)
+		return TRUE;
+
+	return FALSE;	
+}
+
 static void job_table_key_destroy (gpointer data)
 {
-	gint *page = (gint *) data;
+	JobInfoKey  *key = (JobInfoKey *) data;
 
-	g_free (page);
+	g_free (key);
 }
 
 static void job_table_value_destroy (gpointer data)
@@ -109,8 +150,8 @@ ev_pixbuf_cache_init (EvPixbufCache *pixbuf_cache)
 {
 	pixbuf_cache->start_page = -1;
 	pixbuf_cache->end_page = -1;
-
-	pixbuf_cache->job_table = g_hash_table_new_full (g_int_hash, g_int_equal, job_table_key_destroy, job_table_value_destroy);
+	pixbuf_cache->tile_level = 1;
+	pixbuf_cache->job_table = g_hash_table_new_full (job_info_key_hash, job_info_key_equal, job_table_key_destroy, job_table_value_destroy);
 }
 
 static void
@@ -287,13 +328,13 @@ job_finished_cb (EvJob         *job,
 	EvJobRender *job_render = EV_JOB_RENDER (job);
 
 	/* If the job is outside of our interest, we silently discard it */
-	if ((job_render->page < (pixbuf_cache->start_page - pixbuf_cache->preload_cache_size)) ||
+/*	if ((job_render->page < (pixbuf_cache->start_page - pixbuf_cache->preload_cache_size)) ||
 	    (job_render->page > (pixbuf_cache->end_page + pixbuf_cache->preload_cache_size))) {
 		g_object_unref (job);
 		return;
 	}
-
-	job_info = find_job_cache (pixbuf_cache, job_render->page);
+*/
+	job_info = g_object_get_data (G_OBJECT (job), "job_info");
 	if (job_info)
 	{
 		copy_job_to_job_info (job_render, job_info, pixbuf_cache);
@@ -388,6 +429,42 @@ ev_pixbuf_cache_get_page_size (EvPixbufCache *pixbuf_cache,
 	return height * cairo_format_stride_for_width (CAIRO_FORMAT_RGB24, width);
 }
 
+static void
+ev_visible_tiles_get_page_tile_index (EvVisibleTiles *visible_tiles, gint page, int tile, int tile_level, int *n, int *m)
+{
+	if (visible_tiles->dual_page) {
+		// IMPLEMENT
+	} else {
+		int i, j;
+
+		j = tile / tile_level;
+		i = tile % tile_level;
+		*n = i;
+		*m = j + page * tile_level;
+	}
+}
+
+void
+ev_visible_tiles_get_tiles_for_page (EvVisibleTiles *visible_tiles, gint page, EvPageTiles *page_tiles)
+{
+	if (visible_tiles->dual_page) {
+		int dx = (page % 2 == visible_tiles->dual_even_left) ? visible_tiles->tile_level : 0;
+		
+		page_tiles->n_0 = visible_tiles->n_0 - dx;
+		page_tiles->n_1 = visible_tiles->n_1 - dx;
+	
+		page_tiles->m_0 = MAX (0, visible_tiles->m_0 -  (page + visible_tiles->dual_even_left) / 2  * (visible_tiles->tile_level));
+		page_tiles->m_1 = MIN (visible_tiles->tile_level - 1, visible_tiles->m_1 - (page + visible_tiles->dual_even_left) / 2 * visible_tiles->tile_level);		
+	} else {
+		page_tiles->n_0 = visible_tiles->n_0;
+		page_tiles->n_1 = visible_tiles->n_1;
+
+		/* the page is not necessarily visible, so m_0 should be inside good bounds */
+		page_tiles->m_0 = MAX (0, visible_tiles->m_0 -  page * visible_tiles->tile_level);
+		page_tiles->m_1 = MIN (visible_tiles->tile_level - 1, visible_tiles->m_1 - page * visible_tiles->tile_level);
+	}
+}
+
 static gint
 ev_pixbuf_cache_get_preload_size (EvPixbufCache *pixbuf_cache,
 				  gint           start_page,
@@ -448,76 +525,107 @@ ev_pixbuf_cache_update_range (EvPixbufCache *pixbuf_cache,
 			      gint           start_page,
 			      gint           end_page,
 			      guint          rotation,
-			      gdouble        scale)
+			      gdouble        scale,
+			      EvVisibleTiles  *visible_tiles,
+			      gint           tile_level)
 {
 	gint          new_preload_cache_size;
 	GHashTableIter iter;
 	gpointer key, value;
 	gint real_start, real_end, page;
-
+	int i, j;
+	int n_0, n_1;
+	int m_0, m_1;
+	int dual_page = 0, dual_even_left = 1;
+	
 	new_preload_cache_size = ev_pixbuf_cache_get_preload_size (pixbuf_cache,
 								   start_page,
 								   end_page,
 								   scale,
 								   rotation);
+	new_preload_cache_size = 1;
+		
 	if (pixbuf_cache->start_page == start_page &&
 	    pixbuf_cache->end_page == end_page &&
-	    pixbuf_cache->preload_cache_size == new_preload_cache_size)
+	    pixbuf_cache->preload_cache_size == new_preload_cache_size &&
+	    pixbuf_cache->visible_tiles.n_0 == visible_tiles->n_0 &&
+	    pixbuf_cache->visible_tiles.n_1 == visible_tiles->n_1 &&
+	    pixbuf_cache->visible_tiles.m_0 == visible_tiles->m_0 &&
+	    pixbuf_cache->visible_tiles.m_1 == visible_tiles->m_1 )
 		return;
+
+	n_0 = MAX (0, visible_tiles->n_0 - new_preload_cache_size);
+	n_1 = MIN (tile_level - 1 , visible_tiles->n_1 + new_preload_cache_size);
+	m_0 = MAX (0, visible_tiles->m_0 - new_preload_cache_size); 
+	m_1 = MIN (tile_level * ev_document_get_n_pages (pixbuf_cache->document) - 1, visible_tiles->m_1 + new_preload_cache_size); 
 
 	/* We go through each job in the cache and either clear it, and remove it from the
  	 * cache or update its priority */
 
 	g_hash_table_iter_init (&iter, pixbuf_cache->job_table);
+
 	while (g_hash_table_iter_next (&iter, &key, &value))
   	{
-		gint page = *((gint *)key);
+		JobInfoKey *info_key = ((JobInfoKey *) key);
 		CacheJobInfo *job_info = (CacheJobInfo *) value;
+		gint page = info_key->page;
+		gint tile = info_key->tile;
+		gint tile_level = info_key -> tile_level;
+		int n, m;
 
-		if (page < 0 || page < (start_page - new_preload_cache_size) ||
-          		  			page > (end_page + new_preload_cache_size)) {
-
+		ev_visible_tiles_get_page_tile_index (&(pixbuf_cache->visible_tiles), page, tile, tile_level, &n, &m);
+	
+		if (n < n_0 || n > n_1 || m < m_0 || m > m_1) {
 			dispose_cache_job_info (job_info, pixbuf_cache);
 			g_hash_table_iter_remove (&iter);
+		        printf ("Removing tile %d of page %d at coord %d %d from cache\n", tile, page, n, m);
+
         	} else {
 			update_job_priority (job_info, page, new_preload_cache_size, start_page, end_page);
 		}
 	}
 
-	/* We go through all pages in the cache range to add Caches for the pages that don't have
- 	 * a cache. TODO: Possibly change the way we check for pages without cache */
+	/* We go through all tiles in the cache range to add Caches for the tiles that don't have
+ 	 * a cache. TODO: Possibly change the way we check for tiles without cache */
 
-	real_start = MAX (0, start_page - new_preload_cache_size);
-	real_end = MIN (end_page + new_preload_cache_size, ev_document_get_n_pages (pixbuf_cache->document));
 
-	for (page = real_start; page <= real_end; ++page)
-	{
-		CacheJobInfo *job_info;
+	printf ("tiles to cache: %d %d %d %d\n", n_0, n_1, m_0, m_1);
 
-		job_info = find_job_cache (pixbuf_cache, page);
+	for (i = n_0; i  <= n_1; ++i) {
+		for (j = m_0; j <= m_1; ++j) {
+			CacheJobInfo *job_info;
+			JobInfoKey *key = g_new (JobInfoKey, 1);
 
-		if (!job_info) {
-                        gint *key = g_new (gint,1);
+			key->page = j / tile_level;
+			key->tile = i  + (j - key->page * tile_level) * tile_level;
+			key->tile_level = tile_level;
 
-			job_info  = g_slice_new0 (CacheJobInfo);
-			*key = page;
+			job_info = find_job_cache (pixbuf_cache, key);
 
-			g_hash_table_insert (pixbuf_cache->job_table, key, job_info);
+			if (!job_info) {
+				job_info = g_slice_new0 (CacheJobInfo);
+				g_hash_table_insert (pixbuf_cache->job_table, key, job_info);
+				printf ("Adding tile %d of page %d to cache\n", key->tile, key->page);
+			} else {
+				g_free (key);
+			}
 		}
 	}
 
 	pixbuf_cache->preload_cache_size = new_preload_cache_size;
 	pixbuf_cache->start_page = start_page;
 	pixbuf_cache->end_page = end_page;
+	pixbuf_cache->tile_level = tile_level;
+	pixbuf_cache->visible_tiles = *visible_tiles;
 }
 
 static CacheJobInfo *
 find_job_cache (EvPixbufCache *pixbuf_cache,
-		int            page)
+		JobInfoKey    *key)
 {
 	CacheJobInfo *job_info;
 
-	job_info = (CacheJobInfo *) g_hash_table_lookup (pixbuf_cache->job_table, &page);
+	job_info = (CacheJobInfo *) g_hash_table_lookup (pixbuf_cache->job_table, key);
 
 	return job_info;
 }
@@ -564,24 +672,26 @@ add_job (EvPixbufCache  *pixbuf_cache,
 	 cairo_region_t *region,
 	 gint            width,
 	 gint            height,
-	 gint            page,
+	 JobInfoKey     *key,
 	 gint            rotation,
 	 gfloat          scale,
 	 EvJobPriority   priority)
 {
 	g_assert (job_info != NULL);
 
+	printf("Queue render of tile %d of page %d\n", key->tile, key->page);
 	job_info->page_ready = FALSE;
 
 	if (job_info->region)
 		cairo_region_destroy (job_info->region);
 	job_info->region = region ? cairo_region_reference (region) : NULL;
 
-	job_info->job = ev_job_render_new (pixbuf_cache->document,
-					   page, rotation, scale,
-					   width, height);
-
-	if (new_selection_surface_needed (pixbuf_cache, job_info, page, scale)) {
+	job_info->job = ev_job_render_new_tile (pixbuf_cache->document,
+					   key->page, rotation, scale,
+					   width, height, key->tile, key->tile_level);
+	g_object_set_data (G_OBJECT (job_info->job), "job_info", job_info);
+ 
+	if (new_selection_surface_needed (pixbuf_cache, job_info, key->page, scale)) {
 		GdkColor text, base;
 
 		get_selection_colors (pixbuf_cache->view, &text, &base);
@@ -601,7 +711,7 @@ add_job (EvPixbufCache  *pixbuf_cache,
 static void
 add_job_if_needed (EvPixbufCache *pixbuf_cache,
 		   CacheJobInfo  *job_info,
-		   gint           page,
+		   JobInfoKey    *key,
 		   gint           rotation,
 		   gfloat         scale,
 		   EvJobPriority  priority)
@@ -612,12 +722,12 @@ add_job_if_needed (EvPixbufCache *pixbuf_cache,
 		return;
 
 	_get_page_size_for_scale_and_rotation (pixbuf_cache->document,
-					       page, scale, rotation,
+					       key->page, scale, rotation,
 					       &width, &height);
 
 	if (job_info->surface &&
-	    cairo_image_surface_get_width (job_info->surface) == width &&
-	    cairo_image_surface_get_height (job_info->surface) == height)
+	    cairo_image_surface_get_width (job_info->surface) == width / pixbuf_cache->tile_level &&
+	    cairo_image_surface_get_height (job_info->surface) == height / pixbuf_cache->tile_level)
 		return;
 
 	/* Free old surfaces for non visible pages */
@@ -634,7 +744,7 @@ add_job_if_needed (EvPixbufCache *pixbuf_cache,
 	}
 
 	add_job (pixbuf_cache, job_info, NULL,
-		 width, height, page, rotation, scale,
+		 width, height, key, rotation, scale,
 		 priority);
 }
 
@@ -650,10 +760,10 @@ ev_pixbuf_cache_add_jobs_if_needed (EvPixbufCache *pixbuf_cache,
 
 	while (g_hash_table_iter_next (&iter, &key, &value)) {
 		CacheJobInfo *job_info = (CacheJobInfo *)value;
-		gint page = *((gint *) key);
+		JobInfoKey *info_key = (JobInfoKey *) key;
 
 		add_job_if_needed (pixbuf_cache, job_info,
-				   page, rotation, scale,
+				   info_key, rotation, scale,
 				   EV_JOB_PRIORITY_URGENT);
 	}
 }
@@ -662,7 +772,9 @@ void
 ev_pixbuf_cache_set_page_range (EvPixbufCache  *pixbuf_cache,
 				gint            start_page,
 				gint            end_page,
-				GList          *selection_list)
+				GList          *selection_list,
+				EvPageTiles      *tiles_page,
+				gint 		tile_level)
 {
 	gdouble scale = ev_document_model_get_scale (pixbuf_cache->model);
 	gint    rotation = ev_document_model_get_rotation (pixbuf_cache->model);
@@ -675,7 +787,7 @@ ev_pixbuf_cache_set_page_range (EvPixbufCache  *pixbuf_cache,
 
 	/* First, resize the page_range as needed.  We cull old pages
 	 * mercilessly. */
-	ev_pixbuf_cache_update_range (pixbuf_cache, start_page, end_page, rotation, scale);
+	ev_pixbuf_cache_update_range (pixbuf_cache, start_page, end_page, rotation, scale, tiles_page, tile_level);
 
 	/* Then, we update the current jobs to see if any of them are the wrong
 	 * size, we remove them if we need to. */
@@ -712,11 +824,18 @@ ev_pixbuf_cache_set_inverted_colors (EvPixbufCache *pixbuf_cache,
 
 cairo_surface_t *
 ev_pixbuf_cache_get_surface (EvPixbufCache *pixbuf_cache,
-			     gint           page)
+			     gint           page,
+			     gint           tile,
+			     gint           tile_level)
 {
+	JobInfoKey    key;
 	CacheJobInfo *job_info;
 
-	job_info = find_job_cache (pixbuf_cache, page);
+	key.page = page;
+	key.tile = tile;
+	key.tile_level = tile_level;
+
+	job_info = find_job_cache (pixbuf_cache, &key);
 	if (job_info == NULL)
 		return NULL;
 
@@ -821,8 +940,8 @@ ev_pixbuf_cache_get_selection_surface (EvPixbufCache   *pixbuf_cache,
 	/* the document does not implement the selection interface */
 	if (!EV_IS_SELECTION (pixbuf_cache->document))
 		return NULL;
-
-	job_info = find_job_cache (pixbuf_cache, page);
+	return NULL;
+//	job_info = find_job_cache (pixbuf_cache, page);
 	if (job_info == NULL)
 		return NULL;
 
@@ -1010,16 +1129,16 @@ ev_pixbuf_cache_reload_page (EvPixbufCache  *pixbuf_cache,
 	CacheJobInfo *job_info;
         gint width, height;
 
-	job_info = find_job_cache (pixbuf_cache, page);
+//	job_info = find_job_cache (pixbuf_cache, page);
 	if (job_info == NULL)
 		return;
 
 	_get_page_size_for_scale_and_rotation (pixbuf_cache->document,
 					       page, scale, rotation,
 					       &width, &height);
-        add_job (pixbuf_cache, job_info, region,
-		 width, height, page, rotation, scale,
-		 EV_JOB_PRIORITY_URGENT);
+     //   add_job (pixbuf_cache, job_info, region,
+//		 width, height, page, rotation, scale, tile, tile_level,
+//		 EV_JOB_PRIORITY_URGENT);
 }
 
 

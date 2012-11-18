@@ -51,6 +51,28 @@ typedef struct {
 	EvSelectionStyle style;
 } EvViewSelection;
 
+typedef struct _EvVisibleTiles {
+    gint  n_0;
+    gint  n_1;
+    gint  m_0;
+    gint  m_1;
+    gint  dual_page;
+    gint  dual_even_left;
+    gint  tile_width;
+    gint  tile_height;
+    gint  tile_level;
+} EvVisibleTiles;
+
+typedef struct _EvPageTiles {
+    gint  n_0;
+    gint  n_1;
+    gint  m_0;
+    gint  m_1;
+    gint  tile_width;
+    gint  tile_height;
+} EvPageTiles;
+
+
 typedef struct _EvPixbufCache       EvPixbufCache;
 typedef struct _EvPixbufCacheClass  EvPixbufCacheClass;
 
@@ -63,9 +85,13 @@ void           ev_pixbuf_cache_set_max_size         (EvPixbufCache   *pixbuf_cac
 void           ev_pixbuf_cache_set_page_range       (EvPixbufCache *pixbuf_cache,
 						     gint           start_page,
 						     gint           end_page,
-						     GList          *selection_list);
+						     GList         *selection_list,
+						     EvPageTiles   *tiles_page,
+						     gint	    tile_level);
 cairo_surface_t *ev_pixbuf_cache_get_surface        (EvPixbufCache *pixbuf_cache,
-						     gint           page);
+						     gint 	    page,
+						     gint	    tile,
+						     gint           tile_level);
 void           ev_pixbuf_cache_clear                (EvPixbufCache *pixbuf_cache);
 void           ev_pixbuf_cache_style_changed        (EvPixbufCache *pixbuf_cache);
 void           ev_pixbuf_cache_reload_page 	    (EvPixbufCache  *pixbuf_cache,
@@ -83,6 +109,7 @@ cairo_surface_t *ev_pixbuf_cache_get_selection_surface (EvPixbufCache   *pixbuf_
 void           ev_pixbuf_cache_set_selection_list   (EvPixbufCache *pixbuf_cache,
 						     GList         *selection_list);
 GList         *ev_pixbuf_cache_get_selection_list   (EvPixbufCache *pixbuf_cache);
+void	       ev_visible_tiles_get_tiles_for_page (EvVisibleTiles *visible_tiles, gint page, EvPageTiles *page_tiles);
 
 G_END_DECLS
 
