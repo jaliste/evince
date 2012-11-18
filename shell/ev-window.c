@@ -1409,6 +1409,10 @@ ev_window_setup_document (EvWindow *ev_window)
 	EvDocument *document = ev_window->priv->document;
 
 	ev_window->priv->setup_document_idle = 0;
+	screen = gtk_window_get_screen (GTK_WINDOW (ev_window));
+	  ev_view_set_max_tile_size (EV_VIEW (ev_window->priv->view), gdk_screen_get_width (screen),
+                                          gdk_screen_get_height (screen));
+
 
 	ev_window_refresh_window_thumbnail (ev_window);
 
@@ -4303,6 +4307,34 @@ ev_window_cmd_view_presentation (GtkAction *action, EvWindow *window)
 	if (presentation) {
 		ev_window_run_presentation (window);
 	}
+}
+
+static void
+ev_window_update_max_min_scale (EvWindow *window)
+{
+	gdouble    dpi;
+	GtkAction *action;
+	gdouble    min_width, min_height;
+	gdouble    width, height;
+	gdouble    max_scale;
+	gint       rotation = ev_document_model_get_rotation (window->priv->model);
+
+	if (!window->priv->document)
+		return;
+
+	dpi = get_screen_dpi (window) / 72.0;
+
+	ev_document_get_min_page_size (window->priv->document, &min_width, &min_height);
+	width = (rotation == 0 || rotation == 180) ? min_width : min_height;
+	height = (rotation == 0 || rotation == 180) ? min_height : min_width;
+	max_scale = sqrt (PAGE_CACHE_SIZE * 10 / (width * dpi * 4 * height * dpi));
+
+	action = gtk_action_group_get_action (window->priv->action_group,
+					      ZOOM_CONTROL_ACTION);
+	ephy_zoom_action_set_max_zoom_level (EPHY_ZOOM_ACTION (action), max_scale * dpi);
+
+	ev_document_model_set_min_scale (window->priv->model, MIN_SCALE * dpi);
+	ev_document_model_set_max_scale (window->priv->model, max_scale * dpi);
 }
 
 static gboolean
