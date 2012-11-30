@@ -346,12 +346,28 @@ ev_document_model_init (EvDocumentModel *model)
 	model->max_scale = DEFAULT_MAX_SCALE;
 }
 
+/**
+ * ev_document_model_new:
+ *
+ * Creates a new #EvDocumentModel.
+ *
+ * Returns: (transfer full): the #EvDocumentModel just created. 
+ */
 EvDocumentModel *
 ev_document_model_new (void)
 {
 	return g_object_new (EV_TYPE_DOCUMENT_MODEL, NULL);
 }
 
+/**
+ * ev_document_model_new_with_document:
+ * @document a #EvDocument
+ *
+ * Creates a new #EvDocumentModel with its document set to 
+ * @document.
+ *
+ * Returns: (transfer full): the #EvDocumentModel just created.
+ */
 EvDocumentModel *
 ev_document_model_new_with_document (EvDocument *document)
 {
@@ -360,6 +376,14 @@ ev_document_model_new_with_document (EvDocument *document)
 	return g_object_new (EV_TYPE_DOCUMENT_MODEL, "document", document, NULL);
 }
 
+/**
+ * ev_document_model_set_document:
+ * @model a #EvDocumentModel
+ * @document a #EvDocument
+ *
+ * Sets the document of @model to @document. Viewers can listen 
+ * to notify::document to get changes of the document. 
+ */
 void
 ev_document_model_set_document (EvDocumentModel *model,
 				EvDocument      *document)
@@ -397,6 +421,15 @@ ev_document_model_get_document (EvDocumentModel *model)
 	return model->document;
 }
 
+/**
+ * ev_document_model_set_page:
+ * @model a #EvDocumentModel
+ * @page the page index
+ *
+ * Sets the current page of @model to page if page is between
+ * valid bounds. If the page is changed, then the signal "page-changed"
+ * is emitted. 
+ */
 void
 ev_document_model_set_page (EvDocumentModel *model,
 			    gint             page)
@@ -417,6 +450,14 @@ ev_document_model_set_page (EvDocumentModel *model,
 	g_object_notify (G_OBJECT (model), "page");
 }
 
+/**
+ * ev_document_model_set_page_by_label:
+ * @model a #EvDocumentModel
+ * @page_label a page label
+ *
+ * Sets the current page of @model by its label. If the page label is not found
+ * in the document, then the current page of @model is not changed
+ */
 void
 ev_document_model_set_page_by_label (EvDocumentModel *model,
 				     const gchar     *page_label)
@@ -430,6 +471,14 @@ ev_document_model_set_page_by_label (EvDocumentModel *model,
 		ev_document_model_set_page (model, page);
 }
 
+/**
+ * ev_document_model_get_page:
+ * @model a #EvDocumentModel
+ *
+ * Returns the current page of @model
+ *
+ * Returns: the current page of @model
+ */
 gint
 ev_document_model_get_page (EvDocumentModel *model)
 {
@@ -438,6 +487,16 @@ ev_document_model_get_page (EvDocumentModel *model)
 	return model->page;
 }
 
+/**
+ * ev_document_model_set_scale:
+ * @model a #EvDocumentModel
+ * @scale
+ *
+ * Sets the scale of @model to @scale. 
+ * If @scale is larger than the maximum scale of the model
+ * or smaller than the minimum scale of the model, 
+ * then the scale is set to the closest allowed value.
+ */
 void
 ev_document_model_set_scale (EvDocumentModel *model,
 			     gdouble          scale)
@@ -456,6 +515,15 @@ ev_document_model_set_scale (EvDocumentModel *model,
 	g_object_notify (G_OBJECT (model), "scale");
 }
 
+/**
+ * ev_document_model_get_scale: 
+ * @model a #EvDocumentModel
+ *
+ * Returns the current scale of @model
+ *
+ * Returns: the current scale
+ * 
+ */
 gdouble
 ev_document_model_get_scale (EvDocumentModel *model)
 {
@@ -464,6 +532,14 @@ ev_document_model_get_scale (EvDocumentModel *model)
 	return model->scale;
 }
 
+/**
+ * ev_document_model_set_max_scale:
+ * @model a #EvDocumentModel
+ * @max_scale the maximum scale
+ *
+ * Sets the maximum scale of @model to @max_scale
+ *
+ */
 void
 ev_document_model_set_max_scale (EvDocumentModel *model,
 				 gdouble          max_scale)
@@ -481,6 +557,15 @@ ev_document_model_set_max_scale (EvDocumentModel *model,
 	g_object_notify (G_OBJECT (model), "max-scale");
 }
 
+/**
+ * ev_document_model_get_max_scale:
+ * @model a #EvDocumentModel
+ *
+ * Returns the maximum allowed scale of @model. 
+ * Use ev_document_model_set_max_scale() to change it. 
+ *
+ * Returns: the maximum allowed scale
+ */
 gdouble
 ev_document_model_get_max_scale (EvDocumentModel *model)
 {
@@ -489,6 +574,12 @@ ev_document_model_get_max_scale (EvDocumentModel *model)
 	return model->max_scale;
 }
 
+/**
+ * ev_document_model_set_min_scale:
+ * @model a #EvDocumentModel
+ *
+ * Sets the minimum allowed scale of @model. 
+ */
 void
 ev_document_model_set_min_scale (EvDocumentModel *model,
 				 gdouble          min_scale)
@@ -506,6 +597,16 @@ ev_document_model_set_min_scale (EvDocumentModel *model,
 	g_object_notify (G_OBJECT (model), "min-scale");
 }
 
+/**
+ * ev_document_model_get_min_scale:
+ * @model a #EvDocumentModel
+ *
+ * Returns the minimum allowed scale of @model. 
+ * Use ev_document_model_set_min_scale to change it.
+ * 
+ * Returns: the minimum allowed scale
+ */
+
 gdouble
 ev_document_model_get_min_scale (EvDocumentModel *model)
 {
@@ -514,6 +615,13 @@ ev_document_model_get_min_scale (EvDocumentModel *model)
 	return model->min_scale;
 }
 
+/**
+ * ev_document_model_set_sizing_mode:
+ * @model a #EvDocumentModel
+ * @mode  a #EvSizingMode
+ *
+ * Sets the sizing mode of @model to @mode.
+ */ 
 void
 ev_document_model_set_sizing_mode (EvDocumentModel *model,
 				   EvSizingMode     mode)
@@ -528,6 +636,14 @@ ev_document_model_set_sizing_mode (EvDocumentModel *model,
 	g_object_notify (G_OBJECT (model), "sizing-mode");
 }
 
+/**
+ * ev_document_model_get_sizing_mode:
+ * @model a #EvDocumentModel 
+ *
+ * Returns the current sizing mode of @model. 
+ *
+ * Returns: (transfer none): Returns the sizing mode.
+ */
 EvSizingMode
 ev_document_model_get_sizing_mode (EvDocumentModel *model)
 {
@@ -577,6 +693,14 @@ ev_document_model_get_page_layout (EvDocumentModel *model)
 	return model->page_layout;
 }
 
+/**
+ * ev_document_model_set_rotation:
+ * @model a #EvDocumentModel
+ * @rotation the rotation angle in degrees
+ *
+ * Sets the rotation angle of @model to @rotation. Angles 
+ * are automatically normalized to be between 0 and 360
+ */
 void
 ev_document_model_set_rotation (EvDocumentModel *model,
 				gint             rotation)
@@ -596,6 +720,14 @@ ev_document_model_set_rotation (EvDocumentModel *model,
 	g_object_notify (G_OBJECT (model), "rotation");
 }
 
+/**
+ * ev_document_model_get_rotation:
+ * @model a #EvDocumentModel
+ *
+ * Returns the rotation angle of @model. 
+ *
+ * Returns: the rotation angle in degrees
+ */
 gint
 ev_document_model_get_rotation (EvDocumentModel *model)
 {
@@ -604,6 +736,13 @@ ev_document_model_get_rotation (EvDocumentModel *model)
 	return model->rotation;
 }
 
+/**
+ * ev_document_model_set_inverted_colors:
+ * @model a #EvDocumentModel
+ * @inverted_colors
+ *
+ * Sets whether @model has inverted colors
+ */
 void
 ev_document_model_set_inverted_colors (EvDocumentModel *model,
 				       gboolean         inverted_colors)
@@ -618,6 +757,14 @@ ev_document_model_set_inverted_colors (EvDocumentModel *model,
 	g_object_notify (G_OBJECT (model), "inverted-colors");
 }
 
+/**
+ * ev_document_model_get_inverted_colors:
+ * @model a #EvDocumentModel
+ *
+ * Returns whether @model has inverted colors.
+ *
+ * Returns: TRUE if @model has inverted colors, FALSE otherwise
+ */
 gboolean
 ev_document_model_get_inverted_colors (EvDocumentModel *model)
 {
@@ -626,6 +773,14 @@ ev_document_model_get_inverted_colors (EvDocumentModel *model)
 	return model->inverted_colors;
 }
 
+/**
+ * ev_document_model_set_continuous:
+ * @model a #EvDocumentModel
+ * @continuous
+ *
+ * Sets @model to continuous mode if @continuous is TRUE, 
+ * and to single mode if @continuous is FALSE.
+ */
 void
 ev_document_model_set_continuous (EvDocumentModel *model,
 				  gboolean         continuous)
@@ -642,6 +797,14 @@ ev_document_model_set_continuous (EvDocumentModel *model,
 	g_object_notify (G_OBJECT (model), "continuous");
 }
 
+/**
+ * ev_document_model_get_continuous:
+ * @model a #EvDocumentModel
+ *
+ * Returns whether @model is in continuous mode or single mode. 
+ *
+ * Returns: TRUE if @model is in continuous mode, FALSE otherwise.
+ */
 gboolean
 ev_document_model_get_continuous (EvDocumentModel *model)
 {
@@ -650,6 +813,15 @@ ev_document_model_get_continuous (EvDocumentModel *model)
 	return model->continuous;
 }
 
+/**
+ * ev_document_model_set_dual_page:
+ * @model a #EvDocumentModel
+ * @dual_page
+ *
+ * Sets @model to dual page mode (with odd pages on the right) if 
+ * @dual_page is TRUE and to single page mode if @dual_page is FALSE.
+ * Use ev_document_model_set_dual_page_odd_left() to have odd pages on the left.
+ */
 void
 ev_document_model_set_dual_page (EvDocumentModel *model,
 				 gboolean         dual_page)
@@ -670,6 +842,15 @@ ev_document_model_get_dual_page (EvDocumentModel *model)
 	return model->dual_page;
 }
 
+/**
+ * ev_document_model_set_dual_page_odd_pages_left:
+ * @model a #EvDocumentModel
+ * @odd_left
+ *
+ * Sets @model to dual page mode (with odd pages on the right) if 
+ * @dual_page is TRUE and to single page mode if @dual_page is FALSE.
+ * Use ev_document_model_set_dual_page() to have odd pages on the right.
+ */
 void
 ev_document_model_set_dual_page_odd_pages_left (EvDocumentModel *model,
 						gboolean         odd_left)
@@ -694,6 +875,14 @@ ev_document_model_get_dual_page_odd_pages_left (EvDocumentModel *model)
 	return model->dual_page_odd_left;
 }
 
+/**
+ * ev_document_model_set_fullscreen:
+ * @model a #EvDocumentModel
+ * @fullscreen
+ * 
+ * Sets @model to fullscreen mode if @fullscreen is TRUE, and to
+ * non-fullscreen mode otherwise. 
+ */
 void
 ev_document_model_set_fullscreen (EvDocumentModel *model,
 				  gboolean         fullscreen)
@@ -710,6 +899,14 @@ ev_document_model_set_fullscreen (EvDocumentModel *model,
 	g_object_notify (G_OBJECT (model), "fullscreen");
 }
 
+/**
+ * ev_document_model_get_fullscreen:
+ * @model
+ *
+ * Returns whether @model is in fullscreen mode.
+ *
+ * Returns: TRUE if @model is in fullscreen mode, FALSE otherwise.
+ */
 gboolean
 ev_document_model_get_fullscreen (EvDocumentModel *model)
 {
