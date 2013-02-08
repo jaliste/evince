@@ -4622,6 +4622,7 @@ draw_one_page (EvView       *view,
 		gint		 tile_width, tile_height;
 		gint 		 tile_x, tile_y;
 		cairo_surface_t *tile_surface = NULL;
+		gint 		 missing_tiles = 0;
 		int i, j;
 		EvPageTiles tp;
 
@@ -4636,17 +4637,10 @@ draw_one_page (EvView       *view,
 				tile_surface = ev_pixbuf_cache_get_surface (view->pixbuf_cache, page, j * view->tile_level + i, view->tile_level);
 
 				if (!tile_surface) {
-					if (page == current_page)
-						ev_view_set_loading (view, TRUE);
-
-					*page_ready = FALSE;
-
+					missing_tiles++;
 					continue;
 				}
 			
-				if (page == current_page)
-					ev_view_set_loading (view, FALSE);
-
 				tile_width = width / view->tile_level;
 				tile_height = height / view->tile_level;
 				tile_x = tile_width * i;
@@ -4656,6 +4650,11 @@ draw_one_page (EvView       *view,
 			      		      offset_x, offset_y, tile_width, tile_height);
 			}
 		}
+		
+		*page_ready = (missing_tiles == 0) ? TRUE : FALSE;
+
+		if (page == current_page)
+			ev_view_set_loading (view, !*page_ready);
 
 		/* Get the selection pixbuf iff we have something to draw */
 		if (find_selection_for_page (view, page) &&
