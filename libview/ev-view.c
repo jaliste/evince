@@ -677,21 +677,41 @@ ev_view_set_adjustment_values (EvView         *view,
 	gtk_adjustment_changed (adjustment);
 }
 
+static gint
+get_tile_at_page_coord (gint x,
+			gint y,
+			GdkRectangle *page_area,
+			gint tile_level)
+{
+	int tile_width, tile_height;
+
+	/* We need to sustract tile_level so (x,y) = (page_width, page_height)
+	 * get recognized as the end_tile
+	 */
+	x = CLAMP (x, 0, page_area->width - tile_level);
+	y = CLAMP (y, 0, page_area->height - tile_level);
+
+	tile_width = page_area->width / tile_level;
+	tile_height = page_area->height / tile_level;
+
+	return (y / tile_height) * tile_level + (x / tile_width);
+}
+
 /**
  * page_tiles_intersect_area:
  *
  * Computes the tiles of a page that intersect @area
  */
 static gboolean
-get_tiles_for_page_area (EvView *view, gint page, GdkRectangle *area, EvPageTiles *tp)
+get_tiles_intersect_page_area (EvView *view,
+			       gint page,
+			       GdkRectangle *area,
+			       EvPageVisibleTiles *tp)
 {
 	GdkRectangle page_area, overlap;
 	GtkBorder border;
-	int tile_width, tile_height;
 
 	ev_view_get_page_extents (view, page, &page_area, &border);
-        tile_width = page_area.width / view->tile_level;
-        tile_height = page_area.height / view->tile_level;
 
 	if (gdk_rectangle_intersect (area, &page_area, &overlap)) {
 		int x, y;
@@ -699,13 +719,9 @@ get_tiles_for_page_area (EvView *view, gint page, GdkRectangle *area, EvPageTile
 		x = overlap.x - page_area.x;
 		y = overlap.y - page_area.y;
 
-		tp->n_0 = x / tile_width;
-		tp->n_1 = MIN((x + overlap.width) / tile_width, view->tile_level - 1);
-		tp->m_0 = y / tile_height;
-		tp->m_1 = MIN((y + overlap.height) /tile_height, view->tile_level - 1);
-		tp->tile_width = tile_width;
-		tp->tile_height = tile_height;
-	
+		tp->start_tile = get_tile_at_page_coord (x, y, &page_area, view->tile_level);
+		tp->end_tile   = get_tile_at_page_coord (x + overlap.width, y + overlap.height, &page_area, view->tile_level);
+		tp->tile_level = view->tile_level;
 		return TRUE;
 	}
 	return FALSE;
