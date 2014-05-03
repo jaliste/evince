@@ -166,6 +166,23 @@ ev_mapping_list_get_list (EvMappingList *mapping_list)
 	return mapping_list ? mapping_list->list : NULL;
 }
 
+/**
+ * ev_mapping_list_set_remove:
+ * @mapping_list: an #EvMappingList
+ * @data: mapping data to remove
+ *
+ * Returns: an #EvMappingList
+ *
+ * Since: 3.14
+ */
+EvMappingList *
+ev_mapping_list_remove (EvMappingList *mapping_list,
+			gconstpointer  data)
+{
+	mapping_list->list = g_list_remove (mapping_list->list, data);
+	return mapping_list;
+}
+
 guint
 ev_mapping_list_get_page (EvMappingList *mapping_list)
 {
