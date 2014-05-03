@@ -3213,6 +3213,35 @@ ev_view_cancel_add_annotation (EvView *view)
 	ev_view_handle_cursor_over_xy (view, x, y);
 }
 
+void
+ev_view_remove_annotation (EvView       *view,
+			   EvAnnotation *annot)
+{
+	GtkWidget *window;
+	guint      page;
+       
+	g_return_if_fail (EV_IS_VIEW (view));
+	g_return_if_fail (EV_IS_ANNOTATION (annot));
+
+	page = ev_annotation_get_page_index (annot);
+
+	if (EV_IS_ANNOTATION_MARKUP (annot)) {
+		window = g_object_get_data (G_OBJECT (annot), "popup");
+		if (window)
+			gtk_widget_hide (window);
+	}
+        _ev_view_set_focused_element (view, NULL, -1);
+
+	ev_document_doc_mutex_lock ();
+	ev_document_annotations_remove_annotation (EV_DOCUMENT_ANNOTATIONS (view->document),
+						   annot);
+	ev_document_doc_mutex_unlock ();
+
+	ev_page_cache_mark_dirty (view->page_cache, view->current_page);
+
+	ev_view_reload_page (view, page, NULL);
+}
+
 static gboolean
 ev_view_synctex_backward_search (EvView *view,
 				 gdouble x,
