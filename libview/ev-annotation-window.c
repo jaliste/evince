@@ -134,24 +134,8 @@ static void
 ev_annotation_window_set_color (EvAnnotationWindow *window,
 				GdkRGBA            *color)
 {
-        GtkStyleProperties *properties;
-        GtkStyleProvider   *provider;
-
-        properties = gtk_style_properties_new ();
-        gtk_style_properties_set (properties, 0,
-                                  "background-color", color,
-                                  NULL);
-
-        provider = GTK_STYLE_PROVIDER (properties);
-        gtk_style_context_add_provider (gtk_widget_get_style_context (GTK_WIDGET (window)),
-                                        provider, GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-        gtk_style_context_add_provider (gtk_widget_get_style_context (window->close_button),
-                                        provider, GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-        gtk_style_context_add_provider (gtk_widget_get_style_context (window->resize_se),
-                                        provider, GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-        gtk_style_context_add_provider (gtk_widget_get_style_context (window->resize_sw),
-                                        provider, GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-        g_object_unref (properties);
+	gtk_widget_override_background_color (GTK_WIDGET (window), GTK_STATE_FLAG_NORMAL, color);
+	gtk_widget_override_background_color (GTK_WIDGET (window->text_view), GTK_STATE_FLAG_NORMAL, color);
 }
 
 static void
@@ -388,15 +372,11 @@ ev_annotation_window_init (EvAnnotationWindow *window)
 	gtk_widget_show (hbox);
 
 	gtk_container_add (GTK_CONTAINER (window), vbox);
-	gtk_container_set_border_width (GTK_CONTAINER (window), 0);
 	gtk_widget_show (vbox);
 
 	gtk_widget_add_events (GTK_WIDGET (window),
 			       GDK_BUTTON_PRESS_MASK |
 			       GDK_KEY_PRESS_MASK);
-	gtk_widget_set_app_paintable (GTK_WIDGET (window), TRUE);
-
-	gtk_container_set_border_width (GTK_CONTAINER (window), 2);
 
 	gtk_window_set_decorated (GTK_WINDOW (window), FALSE);
 	gtk_window_set_skip_taskbar_hint (GTK_WINDOW (window), TRUE);
