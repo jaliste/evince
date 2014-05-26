@@ -3039,8 +3039,8 @@ ev_view_get_annotation_at_location (EvView  *view,
 }
 
 static void
-ev_view_annotation_show_popup_window (EvView    *view,
-				      GtkWidget *window)
+ev_view_annotation_show_hide_popup_window (EvView    *view,
+				           GtkWidget *window)
 {
 	EvViewWindowChild *child;
 
@@ -3052,6 +3052,9 @@ ev_view_annotation_show_popup_window (EvView    *view,
 		child->visible = TRUE;
 		ev_view_window_child_move (view, child, child->x, child->y);
 		gtk_widget_show (window);
+	} else {
+		child->visible = FALSE;
+		gtk_widget_hide (window);
 	}
 }
 
@@ -3066,7 +3069,7 @@ ev_view_handle_annotation (EvView       *view,
 		GtkWidget *window;
 
 		window = g_object_get_data (G_OBJECT (annot), "popup");
-		ev_view_annotation_show_popup_window (view, window);
+		ev_view_annotation_show_hide_popup_window (view, window);
 	}
 
 	if (EV_IS_ANNOTATION_ATTACHMENT (annot)) {
@@ -3160,7 +3163,7 @@ ev_view_create_annotation (EvView          *view,
 		window = ev_view_create_annotation_window (view, annot, parent);
 
 		/* Show the annot window the first time */
-		ev_view_annotation_show_popup_window (view, window);
+		ev_view_annotation_show_hide_popup_window (view, window);
 	}
 
 	_ev_view_transform_doc_rect_to_view_rect (view, view->current_page, &doc_rect, &view_rect);
