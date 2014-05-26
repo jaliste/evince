@@ -152,9 +152,12 @@ ev_annotation_window_label_changed (EvAnnotationMarkup *annot,
 				    EvAnnotationWindow *window)
 {
 	const gchar *label = ev_annotation_markup_get_label (annot);
+	const gchar *format = "<span size=\"larger\" weight=\"ultrabold\">%s</span>";
+	gchar *markup = g_markup_printf_escaped (format, label);
 
 	gtk_window_set_title (GTK_WINDOW (window), label);
-	gtk_label_set_text (GTK_LABEL (window->title), label);
+	gtk_label_set_markup (GTK_LABEL (window->title), markup);
+	g_free (markup);
 }
 
 static void
@@ -289,7 +292,7 @@ ev_annotation_window_init (EvAnnotationWindow *window)
 
 	gtk_widget_set_can_focus (GTK_WIDGET (window), TRUE);
 
-	vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+	vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 10);
 
 	/* Title bar */
 	hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
@@ -322,6 +325,8 @@ ev_annotation_window_init (EvAnnotationWindow *window)
 	swindow = gtk_scrolled_window_new (NULL, NULL);
 	window->text_view = gtk_text_view_new ();
 	gtk_text_view_set_wrap_mode (GTK_TEXT_VIEW (window->text_view), GTK_WRAP_WORD);
+	gtk_text_view_set_left_margin (GTK_TEXT_VIEW (window->text_view), 10);
+	gtk_text_view_set_right_margin (GTK_TEXT_VIEW (window->text_view), 10);
 	g_signal_connect (window->text_view, "state-flags-changed",
 			  G_CALLBACK (text_view_state_flags_changed),
 			  window);
@@ -395,6 +400,8 @@ ev_annotation_window_constructor (GType                  type,
 	EvAnnotationMarkup *markup;
 	const gchar        *contents;
 	const gchar        *label;
+	const gchar        *format;
+	gchar              *mkp;
 	GdkRGBA             color;
 	EvRectangle        *rect;
 	gdouble             scale;
@@ -430,7 +437,11 @@ ev_annotation_window_constructor (GType                  type,
 
 	gtk_widget_set_name (GTK_WIDGET (window), ev_annotation_get_name (annot));
 	gtk_window_set_title (GTK_WINDOW (window), label);
-	gtk_label_set_text (GTK_LABEL (window->title), label);
+
+	format = "<span size=\"larger\" weight=\"ultrabold\">%s</span>";
+	mkp = g_markup_printf_escaped (format, label);
+	gtk_label_set_markup (GTK_LABEL (window->title), mkp);
+	g_free (mkp);
 
 	contents = ev_annotation_get_contents (annot);
 	if (contents) {
