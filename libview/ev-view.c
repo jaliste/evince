@@ -2888,8 +2888,7 @@ ev_view_annotation_save_contents (EvView       *view,
 				  GParamSpec   *pspec,
 				  EvAnnotation *annot)
 {
-	if (!view->document)
-		return;
+	g_return_if_fail (EV_IS_DOCUMENT (view->document));
 
 	ev_document_doc_mutex_lock ();
 	ev_document_annotations_save_annotation (EV_DOCUMENT_ANNOTATIONS (view->document),
@@ -7217,7 +7216,7 @@ ev_view_document_changed_cb (EvDocumentModel *model,
 
 		if (view->document) {
 			g_object_unref (view->document);
-                }
+		}
 
 		view->document = document ? g_object_ref (document) : NULL;
 		view->find_page = -1;
