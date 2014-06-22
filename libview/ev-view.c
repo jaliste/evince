@@ -53,6 +53,7 @@ enum {
 	SIGNAL_SELECTION_CHANGED,
 	SIGNAL_SYNC_SOURCE,
 	SIGNAL_ANNOT_ADDED,
+	SIGNAL_ANNOT_REMOVED,
 	SIGNAL_LAYERS_CHANGED,
 	SIGNAL_MOVE_CURSOR,
 	SIGNAL_CURSOR_MOVED,
@@ -3219,7 +3220,7 @@ ev_view_remove_annotation (EvView       *view,
 {
 	GtkWidget *window;
 	guint      page;
-       
+
 	g_return_if_fail (EV_IS_VIEW (view));
 	g_return_if_fail (EV_IS_ANNOTATION (annot));
 
@@ -3240,6 +3241,8 @@ ev_view_remove_annotation (EvView       *view,
 	ev_page_cache_mark_dirty (view->page_cache, view->current_page);
 
 	ev_view_reload_page (view, page, NULL);
+
+	g_signal_emit (view, signals[SIGNAL_ANNOT_REMOVED], 0, annot);
 }
 
 static gboolean
@@ -6791,6 +6794,14 @@ ev_view_class_init (EvViewClass *class)
 		         g_cclosure_marshal_VOID__OBJECT,
 		         G_TYPE_NONE, 1,
 			 EV_TYPE_ANNOTATION);
+	signals[SIGNAL_ANNOT_REMOVED] = g_signal_new ("annot-removed",
+	  	         G_TYPE_FROM_CLASS (object_class),
+		         G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+		         G_STRUCT_OFFSET (EvViewClass, annot_removed),
+		         NULL, NULL,
+		         g_cclosure_marshal_VOID__OBJECT,
+		         G_TYPE_NONE, 0,
+			 G_TYPE_NONE);
 	signals[SIGNAL_LAYERS_CHANGED] = g_signal_new ("layers-changed",
 	  	         G_TYPE_FROM_CLASS (object_class),
 		         G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
