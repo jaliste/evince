@@ -336,6 +336,9 @@ static void     ev_window_popup_cmd_copy_image          (GSimpleAction    *actio
 static void     ev_window_popup_cmd_annot_properties    (GSimpleAction    *action,
 							 GVariant         *parameter,
 							 gpointer          user_data);
+static void     ev_window_popup_cmd_remove_annot        (GSimpleAction    *action,
+							 GVariant         *parameter,
+							 gpointer          user_data);
 static void	ev_window_popup_cmd_open_attachment     (GSimpleAction    *action,
 							 GVariant         *parameter,
 							 gpointer          user_data);
@@ -4902,6 +4905,7 @@ view_menu_annot_popup (EvWindow     *ev_window,
 {
 	GAction *action;
 	gboolean show_annot_props = FALSE;
+	gboolean show_remove_annot = FALSE;
 	gboolean show_attachment = FALSE;
 
 	g_clear_object (&ev_window->priv->annot);
@@ -4909,6 +4913,7 @@ view_menu_annot_popup (EvWindow     *ev_window,
 		ev_window->priv->annot = g_object_ref (annot);
 
 		show_annot_props = EV_IS_ANNOTATION_MARKUP (annot);
+		show_remove_annot = ev_document_annotations_can_remove_annotation (EV_DOCUMENT_ANNOTATIONS (ev_window->priv->document));
 
 		if (EV_IS_ANNOTATION_ATTACHMENT (annot)) {
 			EvAttachment *attachment;
@@ -4928,6 +4933,9 @@ view_menu_annot_popup (EvWindow     *ev_window,
 
 	action = g_action_map_lookup_action (G_ACTION_MAP (ev_window), "annot-properties");
 	g_simple_action_set_enabled (G_SIMPLE_ACTION (action), show_annot_props);
+
+	action = g_action_map_lookup_action (G_ACTION_MAP (ev_window), "remove-annot");
+	g_simple_action_set_enabled (G_SIMPLE_ACTION (action), show_remove_annot);
 
 	action = g_action_map_lookup_action (G_ACTION_MAP (ev_window), "open-attachment");
 	g_simple_action_set_enabled (G_SIMPLE_ACTION (action), show_attachment);
@@ -5704,7 +5712,8 @@ static const GActionEntry actions[] = {
 	{ "copy-image", ev_window_popup_cmd_copy_image },
 	{ "open-attachment", ev_window_popup_cmd_open_attachment },
 	{ "save-attachment", ev_window_popup_cmd_save_attachment_as },
-	{ "annot-properties", ev_window_popup_cmd_annot_properties }
+	{ "annot-properties", ev_window_popup_cmd_annot_properties },
+	{ "remove-annot", ev_window_popup_cmd_remove_annot }
 };
 
 static void
@@ -6343,6 +6352,17 @@ ev_window_popup_cmd_annot_properties (GSimpleAction *action,
 	}
 
 	gtk_widget_destroy (GTK_WIDGET (dialog));
+}
+
+static void
+ev_window_popup_cmd_remove_annot (GSimpleAction *action,
+				  GVariant      *parameter,
+				  gpointer       user_data)
+{
+	EvWindow                     *window = user_data;
+
+	ev_view_remove_annotation (EV_VIEW (window->priv->view),
+			           window->priv->annot);
 }
 
 static void
