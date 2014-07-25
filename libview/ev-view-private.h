@@ -113,6 +113,20 @@ typedef struct _EvHeightToPageCache {
 	gdouble *dual_height_to_page;
 } EvHeightToPageCache;
 
+/* Information for handling annotations */
+typedef enum {
+	MODE_NORMAL,
+	MODE_ADD,
+	MODE_DRAW
+} AnnotationModeType;
+
+typedef struct {
+	GdkPoint           start;
+	GdkPoint           stop;
+	AnnotationModeType mode;
+	EvAnnotationType   type;
+} ActiveAnnotInfo;
+
 struct _EvView {
 	GtkContainer layout;
 
@@ -207,8 +221,7 @@ struct _EvView {
 	/* Annotations */
 	GList             *window_children;
 	EvViewWindowChild *window_child_focus;
-	gboolean           adding_annot;
-	EvAnnotationType   adding_annot_type;
+	ActiveAnnotInfo    annot_info;
 
 	/* Focus */
 	EvMapping *focused_element;

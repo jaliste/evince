@@ -2068,7 +2068,7 @@ ev_view_handle_cursor_over_xy (EvView *view, gint x, gint y)
 	if (view->cursor == EV_VIEW_CURSOR_HIDDEN)
 		return;
 
-	if (view->adding_annot) {
+	if (view->annot_info.mode != MODE_NORMAL) {
 		if (view->cursor != EV_VIEW_CURSOR_ADD)
 			ev_view_set_cursor (view, EV_VIEW_CURSOR_ADD);
 		return;
@@ -3151,12 +3151,11 @@ ev_view_handle_annotation (EvView       *view,
 
 static void
 ev_view_create_annotation (EvView          *view,
-			   EvAnnotationType annot_type,
-			   gint             x,
-			   gint             y)
+			   EvAnnotationType annot_type)
 {
 	EvAnnotation   *annot;
-	GdkPoint        point;
+	EvPoint         begin;
+	EvPoint         end;
 	GdkRectangle    page_area;
 	GtkBorder       border;
 	EvRectangle     doc_rect, popup_rect;
@@ -3165,20 +3164,25 @@ ev_view_create_annotation (EvView          *view,
 	GdkRectangle    view_rect;
 	cairo_region_t *region;
 
-	point.x = x;
-	point.y = y;
+	g_assert (view->annot_info.mode == MODE_ADD);
+
 	ev_view_get_page_extents (view, view->current_page, &page_area, &border);
-	_ev_view_transform_view_point_to_doc_point (view, &point, &page_area, &border,
-						    &doc_rect.x1, &doc_rect.y1);
-	doc_rect.x2 = doc_rect.x1 + 24;
-	doc_rect.y2 = doc_rect.y1 + 24;
+	_ev_view_transform_view_point_to_doc_point (view, &view->annot_info.start, &page_area, &border,
+						    &begin.x, &begin.y);
+	_ev_view_transform_view_point_to_doc_point (view, &view->annot_info.stop, &page_area, &border,
+						    &end.x, &end.y);
 
 	ev_document_doc_mutex_lock ();
 	page = ev_document_get_page (view->document, view->current_page);
 	switch (annot_type) {
-	case EV_ANNOTATION_TYPE_TEXT:
-		annot = ev_annotation_text_new (page);
-		break;
+	case EV_ANNOTATION_TYPE_TEXT: {
+		doc_rect.x1 = begin.x;
+ 		doc_rect.y1 = begin.y;
+ 		doc_rect.x2 = doc_rect.x1 + 24;
+ 		doc_rect.y2 = doc_rect.y1 + 24;
+ 		annot = ev_annotation_text_new (page);
+ 		break;
+	}
 	case EV_ANNOTATION_TYPE_ATTACHMENT:
 		/* TODO */
 		g_object_unref (page);
@@ -3252,11 +3256,11 @@ ev_view_begin_add_annotation (EvView          *view,
 	if (annot_type == EV_ANNOTATION_TYPE_UNKNOWN)
 		return;
 
-	if (view->adding_annot)
+	if (view->annot_info.mode == MODE_ADD)
 		return;
 
-	view->adding_annot = TRUE;
-	view->adding_annot_type = annot_type;
+	view->annot_info.mode = MODE_ADD;
+	view->annot_info.type = annot_type;
 	ev_view_set_cursor (view, EV_VIEW_CURSOR_ADD);
 }
 
@@ -3265,10 +3269,10 @@ ev_view_cancel_add_annotation (EvView *view)
 {
 	gint x, y;
 
-	if (!view->adding_annot)
+	if (view->annot_info.mode == MODE_NORMAL)
 		return;
 
-	view->adding_annot = FALSE;
+	view->annot_info.mode = MODE_NORMAL;
 	ev_document_misc_get_pointer_position (GTK_WIDGET (view), &x, &y);
 	ev_view_handle_cursor_over_xy (view, x, y);
 }
@@ -4781,9 +4785,6 @@ ev_view_button_press_event (GtkWidget      *widget,
 	view->pressed_button = event->button;
 	view->selection_info.in_drag = FALSE;
 
-	if (view->adding_annot)
-		return FALSE;
-
 	if (view->scroll_info.autoscrolling)
 		return TRUE;
 
@@ -4834,6 +4835,20 @@ ev_view_button_press_event (GtkWidget      *widget,
 
 				view->image_dnd_info.start.x = event->x + view->scroll_x;
 				view->image_dnd_info.start.y = event->y + view->scroll_y;
+			} else if (view->annot_info.mode == MODE_ADD) {
+				switch (view->annot_info.type) {
+					case EV_ANNOTATION_TYPE_TEXT:
+					case EV_ANNOTATION_TYPE_ATTACHMENT: {
+						view->annot_info.start.x = event->x + view->scroll_x;
+						view->annot_info.start.y = event->y + view->scroll_y;
+						view->annot_info.stop = view->annot_info.start;
+						ev_view_create_annotation (view, view->annot_info.type);
+						view->annot_info.mode = MODE_NORMAL;
+						break;
+					}
+					default:
+						g_assert_not_reached ();
+				}
 			} else {
 				ev_view_remove_all (view);
 				_ev_view_set_focused_element (view, NULL, -1);
@@ -5272,15 +5287,10 @@ ev_view_button_release_event (GtkWidget      *widget,
 
 	view->drag_info.in_drag = FALSE;
 
-	if (view->adding_annot && view->pressed_button == 1) {
-		view->adding_annot = FALSE;
+	if (view->annot_info.mode == MODE_DRAW && view->pressed_button == 1) {
+		view->annot_info.mode = MODE_NORMAL;
 		ev_view_handle_cursor_over_xy (view, event->x, event->y);
 		view->pressed_button = -1;
-
-		ev_view_create_annotation (view,
-					   view->adding_annot_type,
-					   event->x + view->scroll_x,
-					   event->y + view->scroll_y);
 
 		return FALSE;
 	}
@@ -7220,6 +7230,7 @@ ev_view_init (EvView *view)
 	view->caret_enabled = FALSE;
 	view->cursor_page = 0;
 	view->allow_links_change_zoom = TRUE;
+	view->annot_info.mode = MODE_NORMAL;
 
 	g_signal_connect (view, "notify::scale-factor",
 			  G_CALLBACK (on_notify_scale_factor), NULL);
