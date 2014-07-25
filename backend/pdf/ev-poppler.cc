@@ -3250,6 +3250,7 @@ pdf_document_annotations_add_annotation (EvDocumentAnnotations *document_annotat
 static void
 pdf_document_annotations_save_annotation (EvDocumentAnnotations *document_annotations,
 					  EvAnnotation          *annot,
+					  EvRectangle           *area,
 					  EvAnnotationsSaveMask  mask)
 {
 	PopplerAnnot *poppler_annot;
@@ -3298,6 +3299,26 @@ pdf_document_annotations_save_annotation (EvDocumentAnnotations *document_annota
 
 			icon = ev_annotation_text_get_icon (ev_text);
 			poppler_annot_text_set_icon (text, get_poppler_annot_text_icon (icon));
+		}
+	}
+
+	if (EV_IS_ANNOTATION_TEXT_MARKUP (annot)) {
+		EvAnnotationTextMarkup *ev_textmarkup = EV_ANNOTATION_TEXT_MARKUP (annot);
+		PopplerAnnotTextMarkup *textmarkup = POPPLER_ANNOT_TEXT_MARKUP (poppler_annot);
+
+		if (mask & EV_ANNOTATIONS_SAVE_QUADS) {
+			GArray           *quads;
+			PopplerRectangle *bbox;
+
+			bbox = g_slice_new (PopplerRectangle);
+			quads = poppler_page_get_quadrilaterals_for_area (poppler_page, (PopplerRectangle *) area, bbox);
+
+			if (quads->len > 0) {
+				poppler_annot_text_markup_set_quadrilaterals (textmarkup, quads);
+				poppler_annot_set_rectangle (poppler_annot, bbox);
+			}
+			g_array_unref (quads);
+			g_slice_free (PopplerRectangle, bbox);
 		}
 	}
 

@@ -48,11 +48,12 @@ ev_document_annotations_document_is_modified (EvDocumentAnnotations *document_an
 void
 ev_document_annotations_save_annotation (EvDocumentAnnotations *document_annots,
 					 EvAnnotation          *annot,
+					 EvRectangle           *rect,
 					 EvAnnotationsSaveMask  mask)
 {
 	EvDocumentAnnotationsInterface *iface = EV_DOCUMENT_ANNOTATIONS_GET_IFACE (document_annots);
 
-	iface->save_annotation (document_annots, annot, mask);
+	iface->save_annotation (document_annots, annot, rect, mask);
 }
 
 void

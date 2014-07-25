@@ -2957,7 +2957,7 @@ ev_view_annotation_save_contents (EvView       *view,
 
 	ev_document_doc_mutex_lock ();
 	ev_document_annotations_save_annotation (EV_DOCUMENT_ANNOTATIONS (view->document),
-						 annot, EV_ANNOTATIONS_SAVE_CONTENTS);
+						 annot, NULL, EV_ANNOTATIONS_SAVE_CONTENTS);
 	ev_document_doc_mutex_unlock ();
 }
 
