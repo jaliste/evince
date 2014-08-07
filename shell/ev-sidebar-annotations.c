@@ -55,6 +55,7 @@ struct _EvSidebarAnnotationsPrivate {
 	GtkWidget   *tree_view;
 	GtkWidget   *palette;
 	GtkToolItem *annot_text_item;
+	GtkToolItem *annot_highlight_item;
 
 	EvJob       *job;
 	guint        selection_changed_id;
@@ -165,8 +166,8 @@ ev_sidebar_annotations_add_annots_list (EvSidebarAnnotations *ev_annots)
 }
 
 static void
-ev_sidebar_annotations_text_annot_button_toggled (GtkToggleToolButton  *toolbutton,
-						  EvSidebarAnnotations *sidebar_annots)
+ev_sidebar_annotations_annot_button_toggled (GtkToggleToolButton  *toolbutton,
+					     EvSidebarAnnotations *sidebar_annots)
 {
 	EvAnnotationType annot_type;
 
@@ -175,8 +176,14 @@ ev_sidebar_annotations_text_annot_button_toggled (GtkToggleToolButton  *toolbutt
 		return;
 	}
 
-	if (GTK_TOOL_ITEM (toolbutton) == sidebar_annots->priv->annot_text_item)
+	if (GTK_TOOL_ITEM (toolbutton) == sidebar_annots->priv->annot_text_item) {
+		gtk_toggle_tool_button_set_active (GTK_TOGGLE_TOOL_BUTTON (sidebar_annots->priv->annot_highlight_item), FALSE);
 		annot_type = EV_ANNOTATION_TYPE_TEXT;
+	}
+	else if (GTK_TOOL_ITEM (toolbutton) == sidebar_annots->priv->annot_highlight_item) {
+		gtk_toggle_tool_button_set_active (GTK_TOGGLE_TOOL_BUTTON (sidebar_annots->priv->annot_text_item), FALSE);
+		annot_type = EV_ANNOTATION_TYPE_HIGHLIGHT;
+	}
 	else
 		annot_type = EV_ANNOTATION_TYPE_UNKNOWN;
 
@@ -206,7 +213,19 @@ ev_sidebar_annotations_add_annots_palette (EvSidebarAnnotations *ev_annots)
 	gtk_widget_set_tooltip_text (GTK_WIDGET (item), _("Add text annotation"));
 	ev_annots->priv->annot_text_item = item;
 	g_signal_connect (item, "toggled",
-			  G_CALLBACK (ev_sidebar_annotations_text_annot_button_toggled),
+			  G_CALLBACK (ev_sidebar_annotations_annot_button_toggled),
+			  ev_annots);
+	gtk_tool_item_group_insert (GTK_TOOL_ITEM_GROUP (group), item, -1);
+	gtk_widget_show (GTK_WIDGET (item));
+
+	/* FIXME: use a better icon than INDEX */
+	item = gtk_toggle_tool_button_new ();
+	gtk_tool_button_set_icon_name (GTK_TOOL_BUTTON (item), GTK_STOCK_INDEX);
+	gtk_tool_button_set_label (GTK_TOOL_BUTTON (item), _("Highlight"));
+	gtk_widget_set_tooltip_text (GTK_WIDGET (item), _("Add highlight annotation"));
+	ev_annots->priv->annot_highlight_item = item;
+	g_signal_connect (item, "toggled",
+			  G_CALLBACK (ev_sidebar_annotations_annot_button_toggled),
 			  ev_annots);
 	gtk_tool_item_group_insert (GTK_TOOL_ITEM_GROUP (group), item, -1);
 	gtk_widget_show (GTK_WIDGET (item));
@@ -311,14 +330,24 @@ ev_sidebar_annotations_annot_added (EvSidebarAnnotations *sidebar_annots,
 {
 	GtkToggleToolButton *toolbutton;
 
-	if (EV_IS_ANNOTATION_TEXT (annot)) {
-		toolbutton = GTK_TOGGLE_TOOL_BUTTON (sidebar_annots->priv->annot_text_item);
+	if (EV_IS_ANNOTATION (annot)) {
+		switch (ev_annotation_get_annotation_type (annot)) {
+			case EV_ANNOTATION_TYPE_TEXT:
+				toolbutton = GTK_TOGGLE_TOOL_BUTTON (sidebar_annots->priv->annot_text_item);
+				break;
+			case EV_ANNOTATION_TYPE_HIGHLIGHT:
+				toolbutton = GTK_TOGGLE_TOOL_BUTTON (sidebar_annots->priv->annot_highlight_item);
+				break;
+			default:
+				g_assert_not_reached ();
+		}
+
 		g_signal_handlers_block_by_func (toolbutton,
-						 ev_sidebar_annotations_text_annot_button_toggled,
+						 ev_sidebar_annotations_annot_button_toggled,
 						 sidebar_annots);
 		gtk_toggle_tool_button_set_active (toolbutton, FALSE);
 		g_signal_handlers_unblock_by_func (toolbutton,
-						   ev_sidebar_annotations_text_annot_button_toggled,
+						   ev_sidebar_annotations_annot_button_toggled,
 						   sidebar_annots);
 	}
 
