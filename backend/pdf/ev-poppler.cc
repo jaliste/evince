@@ -3170,6 +3170,14 @@ pdf_document_annotations_add_annotation (EvDocumentAnnotations *document_annotat
 						     get_poppler_annot_text_icon (icon));
 			}
 			break;
+		case EV_ANNOTATION_TYPE_HIGHLIGHT: {
+			GArray *quads;
+
+			quads = poppler_page_get_quadrilaterals_for_area (poppler_page, &poppler_rect, NULL);
+			poppler_annot = poppler_annot_text_markup_new_highlight (pdf_document->document, &poppler_rect, quads);
+			g_array_unref (quads);
+		}
+			break;
 		default:
 			g_assert_not_reached ();
 	}
