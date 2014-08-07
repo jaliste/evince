@@ -60,9 +60,10 @@ typedef enum {
 
 	/* Text Markup Annotations */
 	EV_ANNOTATIONS_SAVE_QUADS         = 1 << 9,
+	EV_ANNOTATIONS_SAVE_BBOX          = 1 << 10,
 
 	/* Save all */
-	EV_ANNOTATIONS_SAVE_ALL           = (1 << 10) - 1
+	EV_ANNOTATIONS_SAVE_ALL           = (1 << 11) - 1
 } EvAnnotationsSaveMask;
 
 typedef struct _EvDocumentAnnotations          EvDocumentAnnotations;
