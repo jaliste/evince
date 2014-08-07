@@ -3208,7 +3208,7 @@ ev_view_create_annotation (EvView          *view,
 
 	ev_annotation_set_color (annot, &color);
 
-	if (EV_IS_ANNOTATION_MARKUP (annot)) {
+	if (EV_IS_ANNOTATION_TEXT (annot)) {
 		popup_rect.x1 = doc_rect.x2;
 		popup_rect.x2 = popup_rect.x1 + 200;
 		popup_rect.y1 = doc_rect.y2;
@@ -3217,10 +3217,13 @@ ev_view_create_annotation (EvView          *view,
 			      "rectangle", &popup_rect,
 			      "has_popup", TRUE,
 			      "popup_is_open", FALSE,
-			      "label", g_get_real_name (),
 			      "opacity", 1.0,
 			      NULL);
 	}
+
+	if (EV_IS_ANNOTATION_MARKUP (annot))
+		ev_annotation_markup_set_label (EV_ANNOTATION_MARKUP (annot), g_get_real_name ());
+
 	ev_document_annotations_add_annotation (EV_DOCUMENT_ANNOTATIONS (view->document),
 						annot, &doc_rect);
 	ev_document_doc_mutex_unlock ();
@@ -3229,7 +3232,7 @@ ev_view_create_annotation (EvView          *view,
 	if (!ev_page_cache_get_annot_mapping (view->page_cache, view->current_page))
 		ev_page_cache_mark_dirty (view->page_cache, view->current_page, EV_PAGE_DATA_INCLUDE_ANNOTS);
 
-	if (EV_IS_ANNOTATION_MARKUP (annot)) {
+	if (EV_IS_ANNOTATION_TEXT (annot)) {
 		GtkWindow *parent;
 		GtkWidget *window;
 
