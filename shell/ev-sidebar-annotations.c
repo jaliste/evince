@@ -426,7 +426,7 @@ job_finished_callback (EvJobAnnots          *job,
 				markup = g_strdup_printf ("<span weight=\"bold\">%s</span>", label);
 			}
 
-			if (EV_IS_ANNOTATION_TEXT (annot)) {
+			if (EV_IS_ANNOTATION_TEXT (annot) || EV_IS_ANNOTATION_TEXT_MARKUP (annot)) {
 				if (!text_icon) {
 					/* FIXME: use a better icon than EDIT */
 					text_icon = gtk_widget_render_icon_pixbuf (priv->tree_view,
