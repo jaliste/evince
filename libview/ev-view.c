@@ -3234,12 +3234,13 @@ ev_view_create_annotation (EvView          *view,
 			      "rectangle", &popup_rect,
 			      "has_popup", TRUE,
 			      "popup_is_open", FALSE,
-			      "opacity", 1.0,
 			      NULL);
 	}
 
-	if (EV_IS_ANNOTATION_MARKUP (annot))
+	if (EV_IS_ANNOTATION_MARKUP (annot)) {
 		ev_annotation_markup_set_label (EV_ANNOTATION_MARKUP (annot), g_get_real_name ());
+		ev_annotation_markup_set_opacity (EV_ANNOTATION_MARKUP (annot), 1.0);
+	}
 
 	ev_document_annotations_add_annotation (EV_DOCUMENT_ANNOTATIONS (view->document),
 						annot, &doc_rect);
