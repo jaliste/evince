@@ -1374,4 +1374,28 @@ ev_pixbuf_cache_reload_page (EvPixbufCache  *pixbuf_cache,
 		 EV_JOB_PRIORITY_URGENT);
 }
 
+void
+ev_pixbuf_cache_reload_page_if_possible (EvPixbufCache  *pixbuf_cache,
+				         cairo_region_t *region,
+				         gint            page,
+				         gint            rotation,
+				         gdouble         scale)
+{
+	CacheJobInfo *job_info;
+        gint width, height;
+
+	job_info = find_job_cache (pixbuf_cache, page);
+	if (job_info == NULL)
+		return;
+
+	if (job_info->job)
+		return;
+
+	_get_page_size_for_scale_and_rotation (pixbuf_cache->document,
+					       page, scale, rotation,
+					       &width, &height);
+        add_job (pixbuf_cache, job_info, region,
+		 width, height, page, rotation, scale,
+		 EV_JOB_PRIORITY_URGENT);
+}
 
