@@ -193,6 +193,9 @@ static void       draw_one_page                              (EvView            
 							      GtkBorder          *border,
 							      GdkRectangle       *expose_area,
 							      gboolean		 *page_ready);
+static void       ev_view_reload_page_if_possible            (EvView             *view,
+							      gint                page,
+							      cairo_region_t     *region);
 /*** Callbacks ***/
 static void       ev_view_change_page                        (EvView             *view,
 							      gint                new_page);
@@ -7785,6 +7788,19 @@ ev_view_reload_page (EvView         *view,
 				     page,
 				     view->rotation,
 				     view->scale);
+}
+
+static void
+ev_view_reload_page_if_possible (EvView         *view,
+		                 gint            page,
+				 cairo_region_t *region)
+{
+	ev_pixbuf_cache_reload_page_if_possible (view->pixbuf_cache,
+						 region,
+				                 page,
+				                 view->rotation,
+				                 view->scale);
+
 }
 
 void
