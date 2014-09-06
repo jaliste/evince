@@ -56,6 +56,19 @@ ev_document_annotations_save_annotation (EvDocumentAnnotations *document_annots,
 	iface->save_annotation (document_annots, annot, rect, mask);
 }
 
+gboolean
+ev_document_annotations_render_annotation (EvDocumentAnnotations *document_annots,
+					   EvAnnotation          *annot,
+					   cairo_t               *cr)
+{
+	EvDocumentAnnotationsInterface *iface = EV_DOCUMENT_ANNOTATIONS_GET_IFACE (document_annots);
+
+	if (iface->render_annotation)
+		return iface->render_annotation (document_annots, annot, cr);
+
+	return FALSE;
+}
+
 void
 ev_document_annotations_add_annotation (EvDocumentAnnotations *document_annots,
 					EvAnnotation          *annot,

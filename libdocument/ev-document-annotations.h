@@ -84,6 +84,9 @@ struct _EvDocumentAnnotationsInterface
 						 EvAnnotation          *annot,
 						 EvRectangle           *rect,
 						 EvAnnotationsSaveMask  mask);
+	gboolean       (* render_annotation)    (EvDocumentAnnotations *document_annots,
+						 EvAnnotation	       *annot,
+						 cairo_t	       *cr);
 	void	       (* remove_annotation)    (EvDocumentAnnotations *document_annots,
 						 EvAnnotation          *annot);
 	gboolean       (* is_xy_in_annotation)  (EvDocumentAnnotations *document_annots,
@@ -99,6 +102,10 @@ gboolean       ev_document_annotations_document_is_modified (EvDocumentAnnotatio
 void           ev_document_annotations_add_annotation       (EvDocumentAnnotations *document_annots,
 							     EvAnnotation          *annot,
 							     EvRectangle           *rect);
+gboolean       ev_document_annotations_render_annotation    (EvDocumentAnnotations *document_annots,
+                                                             EvAnnotation          *annot,
+                                                             cairo_t               *cr);
+
 void           ev_document_annotations_remove_annotation    (EvDocumentAnnotations *document_annots,
                                                              EvAnnotation          *annot);
 
