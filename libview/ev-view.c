@@ -110,6 +110,8 @@ typedef struct {
 
 #define ANNOTATION_ICON_SIZE 24
 
+static void
+draw_annot (EvView *view, cairo_t *cr, gint x, gint y, double x_scale, double y_scale);
 /*** Scrolling ***/
 static void       view_update_range_and_current_page         (EvView             *view);
 static void       ensure_rectangle_is_visible                (EvView             *view,
@@ -5241,8 +5243,7 @@ ev_view_motion_notify_event (GtkWidget      *widget,
 								 view->annot_info.annot, &rect, mask);
 			ev_document_doc_mutex_unlock ();
 
-			/* FIXME: reload only annotation area */
-			ev_view_reload_page_if_possible (view, view->current_page, NULL);
+			gtk_widget_queue_draw (GTK_WIDGET (view));
 		} else {
 			/* Schedule timeout to scroll during selection and additionally
 			 * scroll once to allow arbitrary speed. */
@@ -5366,9 +5367,10 @@ ev_view_button_release_event (GtkWidget      *widget,
 							 view->annot_info.annot, NULL,
 							 EV_ANNOTATIONS_SAVE_BBOX);
 		view->annot_info.mode = MODE_NORMAL;
+		view->annot_info.annot = NULL;
 		ev_view_handle_cursor_over_xy (view, event->x, event->y);
 		view->pressed_button = -1;
-
+		ev_view_reload_page (view, view->current_page, NULL);
 		return FALSE;
 	}
 
@@ -6394,6 +6396,23 @@ draw_one_page (EvView       *view,
 
 		draw_surface (cr, page_surface, overlap.x, overlap.y, offset_x, offset_y, width, height);
 
+                if (view->annot_info.annot && ev_annotation_get_page_index (view->annot_info.annot) == page) {
+                        double scale_x, scale_y;
+                        double device_scale_x = 1, device_scale_y = 1;
+
+                        scale_x = (gdouble)width / cairo_image_surface_get_width (page_surface);
+                        scale_y = (gdouble)height / cairo_image_surface_get_height (page_surface);
+
+#ifdef HAVE_HIDPI_SUPPORT
+                        cairo_surface_get_device_scale (page_surface, &device_scale_x, &device_scale_y);
+#endif
+
+                        scale_x *= device_scale_x;
+                        scale_y *= device_scale_y;
+                        draw_annot (view, cr, real_page_area.x, real_page_area.y,
+                                              scale_x, scale_y);
+                }
+
 		/* Get the selection pixbuf iff we have something to draw */
 		if (!find_selection_for_page (view, page))
 			return;
@@ -7340,6 +7359,26 @@ ev_view_change_page (EvView *view,
 
 	gtk_widget_queue_resize (GTK_WIDGET (view));
 }
+
+static void
+draw_annot (EvView *view, cairo_t *cr, gint x, gint y, gdouble scale_x, gdouble scale_y)
+{
+	EvAnnotation *annot = view->annot_info.annot;
+	EvDocumentAnnotations *doc_annots = EV_DOCUMENT_ANNOTATIONS (view->document);
+
+	cairo_save (cr);
+        cairo_translate (cr, x, y);
+        cairo_scale (cr, scale_x * view->scale, scale_y * view->scale);
+
+        if (!EV_IS_ANNOTATION_TEXT_MARKUP (view->annot_info.annot))
+		return;
+
+	ev_document_doc_mutex_lock();
+	ev_document_annotations_render_annotation (doc_annots, annot, cr);
+	ev_document_doc_mutex_unlock();
+	cairo_restore (cr);
+}
+
 
 static void
 job_finished_cb (EvPixbufCache  *pixbuf_cache,
