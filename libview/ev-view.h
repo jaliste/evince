@@ -53,6 +53,9 @@ void 		ev_view_set_loading         (EvView 	     *view,
 					     gboolean         loading);
 gboolean        ev_view_is_loading          (EvView          *view);
 void            ev_view_reload              (EvView          *view);
+void		ev_view_reload_page	    (EvView          *view,
+					     gint            page,
+					     cairo_region_t *region);
 void            ev_view_set_page_cache_size (EvView          *view,
 					     gsize            cache_size);
 
