@@ -6488,7 +6488,7 @@ ev_window_popup_cmd_annot_properties (GSimpleAction *action,
 		ev_document_doc_mutex_unlock ();
 
 		/* FIXME: update annot region only */
-		ev_view_reload (EV_VIEW (window->priv->view));
+		ev_view_reload_page (EV_VIEW (window->priv->view), ev_annotation_get_page_index (annot), NULL);
 	}
 
 	gtk_widget_destroy (GTK_WIDGET (dialog));
