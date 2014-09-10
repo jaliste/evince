@@ -140,6 +140,13 @@ static EvFormField *ev_view_get_form_field_at_location       (EvView            
 							       gdouble            x,
 							       gdouble            y);
 
+static gboolean
+get_selection_page_range (EvView          *view,
+                          GdkPoint        *start,
+                          GdkPoint        *stop,
+                          gint            *first_page,
+                          gint            *last_page);
+
 /*** Annotations ***/
 static EvAnnotation *ev_view_get_annotation_at_location      (EvView             *view,
 							      gdouble             x,
@@ -3190,14 +3197,14 @@ ev_view_create_annotation (EvView          *view,
 
 	g_assert (view->annot_info.mode == MODE_ADD);
 
-	ev_view_get_page_extents (view, view->current_page, &page_area, &border);
+	ev_view_get_page_extents (view, view->annot_info.page, &page_area, &border);
 	_ev_view_transform_view_point_to_doc_point (view, &view->annot_info.start, &page_area, &border,
 						    &begin.x, &begin.y);
 	_ev_view_transform_view_point_to_doc_point (view, &view->annot_info.stop, &page_area, &border,
 						    &end.x, &end.y);
 
 	ev_document_doc_mutex_lock ();
-	page = ev_document_get_page (view->document, view->current_page);
+	page = ev_document_get_page (view->document, view->annot_info.page);
 	switch (annot_type) {
 	case EV_ANNOTATION_TYPE_TEXT: {
 		doc_rect.x1 = begin.x;
@@ -4874,9 +4881,13 @@ ev_view_button_press_event (GtkWidget      *widget,
 				view->image_dnd_info.start.x = event->x + view->scroll_x;
 				view->image_dnd_info.start.y = event->y + view->scroll_y;
 			} else if (view->annot_info.mode == MODE_ADD) {
+				gint last;
 				view->annot_info.start.x = event->x + view->scroll_x;
 				view->annot_info.start.y = event->y + view->scroll_y;
 				view->annot_info.stop = view->annot_info.start;
+				get_selection_page_range (view, &view->annot_info.start,
+							  &view->annot_info.start, 
+							  &view->annot_info.page, &last);
 				ev_view_create_annotation (view, view->annot_info.type);
 
 				switch (view->annot_info.type) {
@@ -5225,7 +5236,7 @@ ev_view_motion_notify_event (GtkWidget      *widget,
 			view->annot_info.stop.x = event->x + view->scroll_x;
 			view->annot_info.stop.y = event->y + view->scroll_y;
 
-			ev_view_get_page_extents (view, view->current_page, &page_area, &border);
+			ev_view_get_page_extents (view, view->annot_info.page, &page_area, &border);
 			_ev_view_transform_view_point_to_doc_point (view, &view->annot_info.start, &page_area, &border,
 								    &begin.x, &begin.y);
 			_ev_view_transform_view_point_to_doc_point (view, &view->annot_info.stop, &page_area, &border,
@@ -5370,7 +5381,7 @@ ev_view_button_release_event (GtkWidget      *widget,
 		view->annot_info.annot = NULL;
 		ev_view_handle_cursor_over_xy (view, event->x, event->y);
 		view->pressed_button = -1;
-		ev_view_reload_page (view, view->current_page, NULL);
+		ev_view_reload_page (view, view->annot_info.page, NULL);
 		return FALSE;
 	}
 
@@ -7369,7 +7380,6 @@ draw_annot (EvView *view, cairo_t *cr, gint x, gint y, gdouble scale_x, gdouble 
 	cairo_save (cr);
         cairo_translate (cr, x, y);
         cairo_scale (cr, scale_x * view->scale, scale_y * view->scale);
-
         if (!EV_IS_ANNOTATION_TEXT_MARKUP (view->annot_info.annot))
 		return;
 
@@ -8501,7 +8511,6 @@ gdk_point_equal (GdkPoint *a,
 
 static gboolean
 get_selection_page_range (EvView          *view,
-			  EvSelectionStyle style,
 			  GdkPoint        *start,
 			  GdkPoint        *stop,
 			  gint            *first_page,
@@ -8566,7 +8575,7 @@ compute_new_selection (EvView          *view,
 	GList *list = NULL;
 
 	/* First figure out the range of pages the selection affects. */
-	if (!get_selection_page_range (view, style, start, stop, &first, &last))
+	if (!get_selection_page_range (view,  start, stop, &first, &last))
 		return list;
 
 	/* Now create a list of EvViewSelection's for the affected

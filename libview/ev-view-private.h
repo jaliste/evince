@@ -126,6 +126,7 @@ typedef struct {
 	AnnotationModeType mode;
 	EvAnnotationType   type;
 	EvAnnotation      *annot;
+	gint		   page;
 } ActiveAnnotInfo;
 
 struct _EvView {
